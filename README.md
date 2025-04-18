@@ -20,4 +20,4 @@ It's a modification of rotating caliphers. Hull points are created from Convex H
 ## Geometry evaluation
 ### Point
 - Get parameterized value indicating the relative position of point on given line in 3d Space.
-- Get intersection point of line on triangle in 3D space.
+- Get intersection point of line on triangle in 3D space. (Möller Trumbore's solution)
