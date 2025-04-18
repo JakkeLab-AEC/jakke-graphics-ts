@@ -1,0 +1,1 @@
+export type ActionResult = {result: boolean, message?: string}
