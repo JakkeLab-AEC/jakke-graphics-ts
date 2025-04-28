@@ -1,4 +1,4 @@
-import { Vertex3d } from "types/basicGeometries";
+import { Vertex3d } from "../models/types/basicGeometries";
 import { computeContexHull2d } from "./convexHullUtils";
 
 export function computeOBB2d(vertices: Vertex3d[]): { p0: Vertex3d, p1: Vertex3d, p2: Vertex3d, p3: Vertex3d } {

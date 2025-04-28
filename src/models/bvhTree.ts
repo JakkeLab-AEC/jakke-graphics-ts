@@ -1,5 +1,5 @@
-import { Vertex3d } from "types/basicGeometries";
-import { ActionResult } from "types/errorMessages";
+import { Vertex3d } from "./types/basicGeometries";
+import { ActionResult } from "./types/errorMessages";
 
 export class BVHTree {
     readonly triangles: BVHTriangle[] = [];

@@ -1,5 +1,5 @@
-import { Vertex3dWrapped } from "models/basic/vertex3d";
-import { Line, Triangle, Vertex3d } from "types/basicGeometries";
+import { Vertex3dWrapped } from "../models/basic/vertex3d";
+import { Line, Triangle, Vertex3d } from "../models/types/basicGeometries";
 
 /**
  * Evaluate the parameter of given line and point.

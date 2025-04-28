@@ -1,4 +1,4 @@
-import { Vertex3d } from "types/basicGeometries";
+import { Vertex3d } from "../types/basicGeometries";
 
 export class Vertex3dWrapped {
     readonly x: number;

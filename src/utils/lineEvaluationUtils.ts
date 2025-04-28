@@ -1,4 +1,4 @@
-import { Line, Vertex3d } from "types/basicGeometries";
+import { Line, Vertex3d } from "../models/types/basicGeometries";
 import { VectorUtils } from "./vectorUtils";
 
 const TOLERANCE_LINE_EVALUATION = 1e-6;

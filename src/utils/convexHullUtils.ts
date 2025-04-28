@@ -1,4 +1,4 @@
-import { Vertex3d } from "types/basicGeometries"
+import { Vertex3d } from "../models/types/basicGeometries"
 
 export function computeContexHull2d(vertices: Vertex3d[]) {
     // Find anchor

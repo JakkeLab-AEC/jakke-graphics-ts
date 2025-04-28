@@ -1,4 +1,4 @@
-import { Line, Vertex3d } from "types/basicGeometries";
+import { Line, Vertex3d } from "../models/types/basicGeometries";
 
 const TOLERANCE_PARALLEL = 1e-6;
 
@@ -7,6 +7,30 @@ function add(v0: Vertex3d, v1: Vertex3d): Vertex3d {
         x: v0.x + v1.x,
         y: v0.y + v1.y,
         z: v0.z + v1.z
+    };
+}
+
+function rotateOnXY(v: Vertex3d, rad: number): Vertex3d {
+    return {
+        x: v.x * Math.cos(rad) - v.y * Math.sin(rad),
+        y: v.x * Math.sin(rad) + v.y * Math.cos(rad),
+        z: v.z
+    }
+}
+
+function rotateOnYZ(v: Vertex3d, rad: number): Vertex3d {
+    return {
+        x: v.x,
+        y: v.y * Math.cos(rad) - v.z * Math.sin(rad),
+        z: v.y * Math.sin(rad) + v.z * Math.cos(rad)
+    };
+}
+
+function rotateOnXZ(v: Vertex3d, rad: number): Vertex3d {
+    return {
+        x: v.x * Math.cos(rad) + v.z * Math.sin(rad),
+        y: v.y,
+        z: -v.x * Math.sin(rad) + v.z * Math.cos(rad)
     };
 }
 
@@ -103,13 +127,25 @@ function chain(initial: Vertex3d): VectorChain {
             current = cross(current, v);
             return api;
         },
-        value() {
-            return current;
-        },
         flip() {
             current = flip(current);
             return api;
-        }
+        },
+        rotateOnXY(rad: number) {
+            current = rotateOnXY(current, rad);
+            return api;
+        },
+        rotateOnYZ(rad: number) {
+            current = rotateOnYZ(current, rad);
+            return api;
+        },
+        rotateOnXZ(rad: number) {
+            current = rotateOnXZ(current, rad);
+            return api;
+        },
+        value() {
+            return current;
+        },
     };
 
     return api;
@@ -125,6 +161,9 @@ interface VectorChain {
     cross(v: Vertex3d): VectorChain;
     value(): Vertex3d;
     flip(): VectorChain;
+    rotateOnXY(rad: number): VectorChain;
+    rotateOnYZ(rad: number): VectorChain;
+    rotateOnXZ(rad: number): VectorChain;
 }
 
 export const VectorUtils = {
@@ -139,5 +178,8 @@ export const VectorUtils = {
     isParallelLines,
     getSize,
     getDist,
+    rotateOnXY,
+    rotateOnYZ,
+    rotateOnXZ,
     chain
 };
