@@ -1,8 +1,18 @@
 import { Vertex3d } from "./types/basicGeometries";
 import { ActionResult } from "./types/errorMessages";
 
+/**
+ * BVHTree for fast traverse of triangles.
+ */
 export class BVHTree {
+    /**
+     * Triangles included.
+     */
     readonly triangles: BVHTriangle[] = [];
+
+    /**
+     * Triangle hashes included in BVHTree.
+     */
     readonly triangleHashes: Set<string> = new Set();
 
     private leftChild?: BVHTree;
@@ -10,8 +20,16 @@ export class BVHTree {
     private parent?: BVHTree;
     private _boundingBox: BVHBoundingBox = BVHBoundingBox.create();
 
+    /**
+     * Get bounding box of this BVHTree.
+     */
     get boundingBox(): BVHBoundingBox { return this._boundingBox; }
 
+    /**
+     * Add triangle at this three.
+     * @param triangle 
+     * @returns Result of adding triangle action.
+     */
     addTriangle(triangle: BVHTriangle): ActionResult {
         const hash = triangle.getHash();
         if (this.triangleHashes.has(hash)) {
@@ -28,11 +46,20 @@ export class BVHTree {
         return { result: true };
     }
 
+    /**
+     * Build BVHTree's structure.
+     * @returns 
+     */
     calculateTree(): BVHTree {
         const sortedTriangles = this.getSortedTriangles();
         return this.buildBVHTree(sortedTriangles);
     }
 
+    /**
+     * Internal method for calculating the tree structure.
+     * @param triangles 
+     * @returns 
+     */
     private buildBVHTree(triangles: BVHTriangle[]): BVHTree {
         if (triangles.length <= 1) {
             const leaf = new BVHTree();
@@ -78,6 +105,10 @@ export class BVHTree {
         return node;
     }
 
+    /**
+     * Internal method for sorting triangles.
+     * @returns 
+     */
     private getSortedTriangles(): BVHTriangle[] {
         const diagonal = this._boundingBox?.getDiagonal();
         if (!diagonal) {
@@ -97,22 +128,38 @@ export class BVHTree {
             });
     }
 
+    /**
+     * Get all nodes included in this tree.
+     * @returns 
+     */
     getAllNodes(): BVHTree[] {
         const nodes: BVHTree[] = [];
         this.traverseTree(nodes);
         return nodes;
     }
 
+    /**
+     * Get all node's bounding box.
+     * @returns 
+     */
     getAllBoundingBoxes(): BVHBoundingBox[] {
         return this.getAllNodes().map(n => n._boundingBox);
     }
 
+    /**
+     * Internal method for traverse tree for collecting all nodes.
+     * @param nodes 
+     */
     private traverseTree(nodes: BVHTree[]): void {
         nodes.push(this);
         this.leftChild?.traverseTree(nodes);
         this.rightChild?.traverseTree(nodes);
     }
 
+    /**
+     * Get root node of this tree.
+     * @returns 
+     */
     getRoot(): BVHTree {
         let current: BVHTree = this;
         while (current.parent) {
@@ -121,6 +168,16 @@ export class BVHTree {
         return current;
     }
 
+    /**
+     * Get the intersection point between the given line and tree.
+     * This uses Möller Trumbore's soluion for determine the collision.
+     * Currently, it returns only the first collision point.
+     * @param p1 The start point of line.
+     * @param p2 The end point of line.
+     * @param onlyOnLine Parameter for testing the getting collision point. 
+     *                   When this set true, it returns the collision point including outbound of the line.
+     * @returns Intersection point when only the intersection exists.
+     */
     getRayCollision(p1: Vertex3d, p2: Vertex3d, onlyOnLine: boolean): Vertex3d | undefined {
         if (!this.isRayCollideAABB(p1, p2)) return;
 
@@ -140,6 +197,12 @@ export class BVHTree {
             || this.rightChild?.getRayCollision(p1, p2, onlyOnLine);
     }
 
+    /**
+     * Internal method for determine the collision between line and bounding box.
+     * @param p1 The start point of line.
+     * @param p2 The end point of line.
+     * @returns 
+     */
     private isRayCollideAABB(p1: Vertex3d, p2: Vertex3d): boolean {
         const ptMin = this._boundingBox.min;
         const ptMax = this._boundingBox.max;
@@ -153,6 +216,16 @@ export class BVHTree {
         return intersections.filter(pt => pt !== undefined).length === 1;
     }
 
+    /**
+     * Internal method of testing the collision between line and AABB.
+     * @param p1 The start point of line.
+     * @param p2 The end point of line.
+     * @param axis x, y, z can be set.
+     * @param value 
+     * @param ptMin The minimum point of bounding box.
+     * @param ptMax The maximum point of bounding box.
+     * @returns 
+     */
     private raycastOnPlane(p1: Vertex3d, p2: Vertex3d, axis: keyof Vertex3d, value: number, ptMin: Vertex3d, ptMax: Vertex3d): Vertex3d | undefined {
         const delta = p2[axis] - p1[axis];
         if (delta === 0) return undefined;
@@ -167,6 +240,13 @@ export class BVHTree {
         return this.isPointInside(pt, ptMin, ptMax) ? pt : undefined;
     }
 
+    /**
+     * 
+     * @param pt 
+     * @param min 
+     * @param max 
+     * @returns 
+     */
     private isPointInside(pt: Vertex3d, min: Vertex3d, max: Vertex3d): boolean {
         return min.x <= pt.x && pt.x <= max.x
             && min.y <= pt.y && pt.y <= max.y
