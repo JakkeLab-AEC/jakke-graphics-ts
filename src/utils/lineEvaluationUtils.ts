@@ -28,7 +28,7 @@ function getPointOnLine(line: {p0: Vertex3d, p1: Vertex3d}, dist: number, fromSt
  * @param fromExtended When it's true, intersection will be calculated including extended lines of li0, li1. Otherwise, only within li0, li1 boundary.
  * @returns When the intersection exists, result will be true and pt will be that point. Otherwise, result false and message will include the reason of it.
  */
-function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: boolean,  pt?: Vertex3d, message?: string} {
+function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: boolean,  pt?: Vertex3d, message?: string, det?: number} {
     if(VectorUtils.isParallelLines(li0, li1)) return {result: false, message: "Parallel or same Lines"};
 
     // Projection on XY Plane
@@ -63,8 +63,8 @@ function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: b
     });
 
     const det = -(d0PlaneXY.x * d1PlaneXY.y) + (d1PlaneXY.x * d0PlaneXY.y);
-    const detAbs = Math.abs(Math.abs(det) - 1);
-    if(detAbs > TOLERANCE_LINE_EVALUATION) return {result: false, message: "Det is zero."};
+    const detAbs = Math.abs(det);
+    if(detAbs < TOLERANCE_LINE_EVALUATION) return {result: false, message: "Det is zero.", det: det};
 
     const dx = p1p3.x;
     const dy = p1p3.y;
@@ -138,9 +138,9 @@ function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: b
 
         if((-TOLERANCE_LINE_EVALUATION <= paramPtQ2 && paramPtQ2 <= 1 + TOLERANCE_LINE_EVALUATION) && 
            (-TOLERANCE_LINE_EVALUATION <= paramPtR2 && paramPtR2 <= 1 + TOLERANCE_LINE_EVALUATION)) {
-            return {result: true, pt: ptQ2};
+            return {result: true, pt: ptQ2, det: det};
         } else {
-            return {result: false, message: "One of the points are placed on outside the line's domain."};
+            return {result: false, message: "One of the points are placed on outside the line's domain.", det: det};
         }
     }
 }
