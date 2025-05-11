@@ -13,7 +13,6 @@ type BoundingBox2d = {
 
 type BoundingBox3d = {
     anchor: Vertex3d,
-    uAxis: Vertex3d,
     nAxis: Vertex3d,
     length: {
         u: number,
@@ -76,5 +75,12 @@ export function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox
 }
 
 export function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d): boolean {
+    const baseAxisOfA = VectorUtils.normalize(boxA.nAxis);
+    const thetaOfA = Math.atan2(baseAxisOfA.y, baseAxisOfA.x);
+    const ptAOfA = VectorUtils.rotateOnXY({...baseAxisOfA, z: 0}, -theta);
+    const ptBOfA: Vertex3d = {...ptAOfA, z: baseAxisOfA.z};
+    const psiOfA = Math.atan2(ptBOfA.z, ptBOfA.x);
+
     
+
 }
