@@ -1,5 +1,5 @@
-import { BoundingBox2d, BoundingBox3d } from "../models/types/basicGeometries";
-import { CollisionUtils } from "../utils/collisionUtils";
+import { BoundingBox2d, BoundingBox3d } from "../src/models/types/basicGeometries";
+import { CollisionUtils } from "../src/utils/collisionUtils";
 
 describe('Collision Tests', () => {
     test('Collision Test 2d, when meets at a point', () => {
