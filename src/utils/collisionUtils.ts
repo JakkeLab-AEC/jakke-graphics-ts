@@ -1,59 +1,43 @@
-import { Vertex2d, Vertex3d } from "models/types/basicGeometries"
+import { BoundingBox2d, BoundingBox3d, Vertex2d, Vertex3d } from "models/types/basicGeometries"
 import { VectorUtils } from "./vectorUtils"
 import { LineEvaluation } from "./lineEvaluationUtils"
 import { ActionResult } from "models/types/errorMessages"
 
-type BoundingBox2d = {
-    anchor: Vertex2d,
-    uAxis: Vertex2d,
-    length: {
-        u: number,
-        v: number,
-    }
-}
-
-type BoundingBox3d = {
-    anchor: Vertex3d,
-    uAxis: Vertex3d,
-    vAxis: Vertex3d,
-    length: {
-        u: number,
-        v: number,
-        n: number,
-    }
-}
-
 const ZERO_VECTOR_TOLERANCE = 1e-6;
 const UNIT_VECTOR_TOLERANCE = 1e-6;
+const COLLISION_TOLERANCE = 1e-6;
 
-function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox2d, includeContating = false): ActionResult {
+type CollisionResult = {hasCollision: boolean, hasError: boolean, sectionByA?: number[], sectionByB?: number[]}
+export type SATSections = { setionByA: number[] | undefined, setionByB: number[] | undefined }[];
+
+function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox2d, includeContating = false): ActionResult<SATSections> {
     // Filter the case when zero vectors are given.
-    if(VectorUtils.getSize({...boxA.uAxis, z: 0}) <= ZERO_VECTOR_TOLERANCE || VectorUtils.getSize({...boxA.uAxis, z: 0}) <= ZERO_VECTOR_TOLERANCE) {
-        return {result: false, hasError: true, message: "The vector of each boundingbox should not be zero."}
+    if (VectorUtils.getSize({ ...boxA.uAxis, z: 0 }) <= ZERO_VECTOR_TOLERANCE || VectorUtils.getSize({ ...boxB.uAxis, z: 0 }) <= ZERO_VECTOR_TOLERANCE) {
+        return { result: false, hasError: true, message: "The vector of each boundingbox should not be zero." }
     }
 
-    const uAxisOfA = VectorUtils.normalize({...boxA.uAxis, z: 0});
-    const vAxisOfA = VectorUtils.rotateOnXY({...uAxisOfA, z: 0}, Math.PI * 0.5);
+    const uAxisOfA = VectorUtils.normalize({ ...boxA.uAxis, z: 0 });
+    const vAxisOfA = VectorUtils.rotateOnXY({ ...uAxisOfA, z: 0 }, Math.PI * 0.5);
 
-    const uAxisOfB = VectorUtils.normalize({...boxB.uAxis, z: 0});
-    const vAxisOfB = VectorUtils.rotateOnXY({...uAxisOfB, z: 0}, Math.PI * 0.5);
+    const uAxisOfB = VectorUtils.normalize({ ...boxB.uAxis, z: 0 });
+    const vAxisOfB = VectorUtils.rotateOnXY({ ...uAxisOfB, z: 0 }, Math.PI * 0.5);
 
     const axes = [uAxisOfA, vAxisOfA, uAxisOfB, vAxisOfB];
 
     // Get all pts of A
-    const p0OfA = {...boxA.anchor, z:0};
-    const p1OfA = VectorUtils.add({...boxA.anchor, z: 0}, VectorUtils.scale({...uAxisOfA, z: 0}, boxA.length.u));
-    const p3OfA = VectorUtils.add({...boxA.anchor, z: 0}, VectorUtils.scale({...vAxisOfA, z: 0}, boxA.length.v));
-    const p2OfA = VectorUtils.add(p1OfA, VectorUtils.scale({...vAxisOfA, z: 0}, boxA.length.v));
+    const p0OfA = { ...boxA.anchor, z: 0 };
+    const p1OfA = VectorUtils.add({ ...boxA.anchor, z: 0 }, VectorUtils.scale({ ...uAxisOfA, z: 0 }, boxA.length.u));
+    const p3OfA = VectorUtils.add({ ...boxA.anchor, z: 0 }, VectorUtils.scale({ ...vAxisOfA, z: 0 }, boxA.length.v));
+    const p2OfA = VectorUtils.add(p1OfA, VectorUtils.scale({ ...vAxisOfA, z: 0 }, boxA.length.v));
 
     // Get all pts of B
-    const p0OfB = {...boxB.anchor, z:0};
-    const p1OfB = VectorUtils.add({...boxB.anchor, z: 0}, VectorUtils.scale({...uAxisOfB, z: 0}, boxB.length.u));
-    const p3OfB = VectorUtils.add({...boxB.anchor, z: 0}, VectorUtils.scale({...vAxisOfB, z: 0}, boxB.length.v));
-    const p2OfB = VectorUtils.add(p1OfB, VectorUtils.scale({...vAxisOfB, z: 0}, boxB.length.v));
+    const p0OfB = { ...boxB.anchor, z: 0 };
+    const p1OfB = VectorUtils.add({ ...boxB.anchor, z: 0 }, VectorUtils.scale({ ...uAxisOfB, z: 0 }, boxB.length.u));
+    const p3OfB = VectorUtils.add({ ...boxB.anchor, z: 0 }, VectorUtils.scale({ ...vAxisOfB, z: 0 }, boxB.length.v));
+    const p2OfB = VectorUtils.add(p1OfB, VectorUtils.scale({ ...vAxisOfB, z: 0 }, boxB.length.v));
 
-    const collisionResult = axes.every(axis => {
-        // Get all foot point on uAxis of A
+    const collisionResult: CollisionResult[] = axes.map(axis => {
+        // Get all foot point on axis of A
         const ptsOnAxisFromA = [
             LineEvaluation.getFootPointOnLine(axis, p0OfA),
             LineEvaluation.getFootPointOnLine(axis, p1OfA),
@@ -68,6 +52,14 @@ function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox2d, inc
             LineEvaluation.getFootPointOnLine(axis, p3OfB),
         ];
 
+        // Filter the case when pts has undefined;
+        const checkUndefinedPtsA = ptsOnAxisFromA.every(p => p !== undefined);
+        const checkUndefinedPtsB = ptsOnAxisFromB.every(p => p !== undefined);
+
+        if (!checkUndefinedPtsA || !checkUndefinedPtsB) {
+            return { hasError: true, hasCollision: false }
+        }
+
         const sortedParamsFromA = ptsOnAxisFromA
             .sort((a, b) => a.t - b.t)
             .map(a => a.t);
@@ -75,22 +67,31 @@ function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox2d, inc
         const sortedParamsFromB = ptsOnAxisFromB
             .sort((a, b) => a.t - b.t)
             .map(a => a.t);
-        
+
         const sectionByA = [sortedParamsFromA[0], sortedParamsFromA[3]];
         const sectionByB = [sortedParamsFromB[0], sortedParamsFromB[3]];
 
-
+        let isSeparated: boolean;
         if (includeContating) {
-            return sectionByA[1] <= sectionByB[0] || sectionByB[1] <= sectionByA[0];
+            isSeparated = sectionByA[1] < sectionByB[0] - COLLISION_TOLERANCE || sectionByB[1] < sectionByA[0] - COLLISION_TOLERANCE;
         } else {
-            return sectionByA[1] < sectionByB[0] || sectionByB[1] < sectionByA[0];
+            isSeparated = sectionByA[1] < sectionByB[0] + COLLISION_TOLERANCE || sectionByB[1] < sectionByA[0] + COLLISION_TOLERANCE;
         }
+        return { hasError: false, hasCollision: !isSeparated, sectionByA, sectionByB };
     });
 
-    return {result: collisionResult}
+    return {
+        result: collisionResult.every(result => !result.hasError && result.hasCollision),
+        args: collisionResult.map(result => {
+            return {
+                setionByA: result.sectionByA,
+                setionByB: result.sectionByB,
+            }
+        })
+    }
 }
 
-function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, includeContating = false): ActionResult {
+function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, includeContating = false): ActionResult<SATSections> {
     // Filter the case when zero vectors are given.
     const hasZeroVectors = [
         boxA.uAxis,
@@ -137,7 +138,7 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
     const p7B = VectorUtils.add({...p3B}, nAxisB);
 
     const axes = [uAxisA, vAxisA, nAxisA, uAxisB, vAxisB, nAxisB];
-    const satResult = axes.every(axis => {
+    const collisionResult: CollisionResult[] = axes.map(axis => {
         const ptsOnAxisFromA = [
             LineEvaluation.getFootPointOnLine(axis, p0A),
             LineEvaluation.getFootPointOnLine(axis, p1A),
@@ -160,6 +161,14 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
             LineEvaluation.getFootPointOnLine(axis, p7B),
         ];
 
+        // Filter the case when pts has undefined;
+        const checkUndefinedPtsA = ptsOnAxisFromA.every(p => p !== undefined);
+        const checkUndefinedPtsB = ptsOnAxisFromB.every(p => p !== undefined);
+
+        if(!checkUndefinedPtsA || !checkUndefinedPtsB) {
+            return {hasError : true, hasCollision: false}
+        }
+
         const sortedParamsFromA = ptsOnAxisFromA
             .sort((a, b) => a.t - b.t)
             .map(a => a.t);
@@ -171,14 +180,25 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
         const sectionByA = [sortedParamsFromA[0], sortedParamsFromA[7]];
         const sectionByB = [sortedParamsFromB[0], sortedParamsFromB[7]];
 
+        let isSeparated: boolean;
         if (includeContating) {
-            return sectionByA[7] <= sectionByB[0] || sectionByB[7] <= sectionByA[0];
+            isSeparated = sectionByA[7] < sectionByB[0] - COLLISION_TOLERANCE || sectionByB[7] < sectionByA[0] - COLLISION_TOLERANCE;
         } else {
-            return sectionByA[7] < sectionByB[0] || sectionByB[7] < sectionByA[0];
+            isSeparated = sectionByA[7] < sectionByB[0] + COLLISION_TOLERANCE || sectionByB[7] < sectionByA[0] + COLLISION_TOLERANCE;
         }
+
+        return { hasError: false, hasCollision: !isSeparated, sectionByA, sectionByB };
     });
 
-    return {result: satResult}
+    return {
+        result: collisionResult.every(result => !result.hasError && result.hasCollision),
+        args: collisionResult.map(result => {
+            return {
+                setionByA: result.sectionByA,
+                setionByB: result.sectionByB,
+            }
+        })
+    }
 }
 
 export const CollisionUtils = {

@@ -173,10 +173,10 @@ function getParameterOnLine(p0: Vertex3d, p1: Vertex3d, ptTest: Vertex3d): numbe
  * @param pt Point to foot on line.
  * @returns If you set direction as zero vector, it will return origin and param as 0.
  */
-function getFootPointOnLine(direction: Vertex3d, pt: Vertex3d): {pt: Vertex3d, t: number} {
+function getFootPointOnLine(direction: Vertex3d, pt: Vertex3d): {pt: Vertex3d, t: number}|undefined {
     const norm = VectorUtils.normalize(direction);
     const dSize = VectorUtils.getSize(norm);
-    if(dSize === 0) return {x: 0, y: 0, z: 0};
+    if(dSize === 0) return;
 
     const dot = VectorUtils.dot(norm, pt);
     const t = dot / Math.pow(dSize, 2);
