@@ -168,24 +168,52 @@ function getParameterOnLine(p0: Vertex3d, p1: Vertex3d, ptTest: Vertex3d): numbe
 }
 
 /**
- * Find foot point on line passing origin, which has direction as given.
+ * Find foot point on line passing, which has direction as given.
  * @param direction Direction of line.
  * @param pt Point to foot on line.
  * @returns If you set direction as zero vector, it will return origin and param as 0.
  */
-function getFootPointOnLine(direction: Vertex3d, pt: Vertex3d): {pt: Vertex3d, t: number}|undefined {
+function getFootPointOnDirection(direction: Vertex3d, pt: Vertex3d): {pt: Vertex3d, t: number}|undefined {
+    if(VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION) return;
+
     const norm = VectorUtils.normalize(direction);
     const dSize = VectorUtils.getSize(norm);
-    if(dSize === 0) return;
 
     const dot = VectorUtils.dot(norm, pt);
     const t = dot / Math.pow(dSize, 2);
     return {pt: VectorUtils.scale(norm, t), t};
 }
 
+/**
+ * Find foot point on line.
+ * @param line Line passing two points.
+ * @param pt Point to foot on line.
+ * @returns If you set each point of the line which has almost same coordinate each other, it will return origin and param as 0.
+ */
+function getFootPointOnLine(line: Line, pt: Vertex3d): {pt: Vertex3d, t: number}|undefined {
+    const direction = VectorUtils.subtract(line.p1, line.p0);
+    if(VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION) return;
+    
+    const anchor = line.p0;
+    const ptMoved = VectorUtils.subtract(pt, anchor);
+
+    const norm = VectorUtils.normalize(direction);
+    const dSize = VectorUtils.getSize(norm);
+    if(dSize === 0) return;
+
+    const dot = VectorUtils.dot(norm, ptMoved);
+    const t = dot / Math.pow(dSize, 2);
+    
+    const ptOnMovedLine = VectorUtils.scale(norm, t);
+    const ptFooting = VectorUtils.add(ptOnMovedLine, anchor);
+    return {pt: ptFooting, t};
+}
+
+
 export const LineEvaluation = {
     getPointOnLine,
     getIntersection,
     getParameterOnLine,
-    getFootPointOnLine
+    getFootPointOnLine,
+    getFootPointOnDirection
 }
