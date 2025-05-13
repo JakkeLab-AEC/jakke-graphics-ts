@@ -8,3 +8,4 @@ export * from './utils/lineEvaluationUtils';
 export * from './models/types/basicGeometries';
 export * from './models/types/errorMessages';
 export * from './utils/collisionUtils';
+export * from './utils/lineManipluationUtils';

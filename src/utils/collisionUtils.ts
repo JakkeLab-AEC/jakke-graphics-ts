@@ -39,17 +39,17 @@ function hasBoundingBoxCollision2d(boxA: BoundingBox2d, boxB: BoundingBox2d, inc
     const collisionResult: CollisionResult[] = axes.map(axis => {
         // Get all foot point on axis of A
         const ptsOnAxisFromA = [
-            LineEvaluation.getFootPointOnLine(axis, p0OfA),
-            LineEvaluation.getFootPointOnLine(axis, p1OfA),
-            LineEvaluation.getFootPointOnLine(axis, p2OfA),
-            LineEvaluation.getFootPointOnLine(axis, p3OfA),
+            LineEvaluation.getFootPointOnDirection(axis, p0OfA),
+            LineEvaluation.getFootPointOnDirection(axis, p1OfA),
+            LineEvaluation.getFootPointOnDirection(axis, p2OfA),
+            LineEvaluation.getFootPointOnDirection(axis, p3OfA),
         ];
 
         const ptsOnAxisFromB = [
-            LineEvaluation.getFootPointOnLine(axis, p0OfB),
-            LineEvaluation.getFootPointOnLine(axis, p1OfB),
-            LineEvaluation.getFootPointOnLine(axis, p2OfB),
-            LineEvaluation.getFootPointOnLine(axis, p3OfB),
+            LineEvaluation.getFootPointOnDirection(axis, p0OfB),
+            LineEvaluation.getFootPointOnDirection(axis, p1OfB),
+            LineEvaluation.getFootPointOnDirection(axis, p2OfB),
+            LineEvaluation.getFootPointOnDirection(axis, p3OfB),
         ];
 
         // Filter the case when pts has undefined;
@@ -140,25 +140,25 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
     const axes = [uAxisA, vAxisA, nAxisA, uAxisB, vAxisB, nAxisB];
     const collisionResult: CollisionResult[] = axes.map(axis => {
         const ptsOnAxisFromA = [
-            LineEvaluation.getFootPointOnLine(axis, p0A),
-            LineEvaluation.getFootPointOnLine(axis, p1A),
-            LineEvaluation.getFootPointOnLine(axis, p2A),
-            LineEvaluation.getFootPointOnLine(axis, p3A),
-            LineEvaluation.getFootPointOnLine(axis, p4A),
-            LineEvaluation.getFootPointOnLine(axis, p5A),
-            LineEvaluation.getFootPointOnLine(axis, p6A),
-            LineEvaluation.getFootPointOnLine(axis, p7A),
+            LineEvaluation.getFootPointOnDirection(axis, p0A),
+            LineEvaluation.getFootPointOnDirection(axis, p1A),
+            LineEvaluation.getFootPointOnDirection(axis, p2A),
+            LineEvaluation.getFootPointOnDirection(axis, p3A),
+            LineEvaluation.getFootPointOnDirection(axis, p4A),
+            LineEvaluation.getFootPointOnDirection(axis, p5A),
+            LineEvaluation.getFootPointOnDirection(axis, p6A),
+            LineEvaluation.getFootPointOnDirection(axis, p7A),
         ];
 
         const ptsOnAxisFromB = [
-            LineEvaluation.getFootPointOnLine(axis, p0B),
-            LineEvaluation.getFootPointOnLine(axis, p1B),
-            LineEvaluation.getFootPointOnLine(axis, p2B),
-            LineEvaluation.getFootPointOnLine(axis, p3B),
-            LineEvaluation.getFootPointOnLine(axis, p4B),
-            LineEvaluation.getFootPointOnLine(axis, p5B),
-            LineEvaluation.getFootPointOnLine(axis, p6B),
-            LineEvaluation.getFootPointOnLine(axis, p7B),
+            LineEvaluation.getFootPointOnDirection(axis, p0B),
+            LineEvaluation.getFootPointOnDirection(axis, p1B),
+            LineEvaluation.getFootPointOnDirection(axis, p2B),
+            LineEvaluation.getFootPointOnDirection(axis, p3B),
+            LineEvaluation.getFootPointOnDirection(axis, p4B),
+            LineEvaluation.getFootPointOnDirection(axis, p5B),
+            LineEvaluation.getFootPointOnDirection(axis, p6B),
+            LineEvaluation.getFootPointOnDirection(axis, p7B),
         ];
 
         // Filter the case when pts has undefined;
