@@ -1,7 +1,7 @@
-import { BoundingBox2d, BoundingBox3d, Vertex2d, Vertex3d } from "models/types/basicGeometries"
+import { BoundingBox2d, BoundingBox3d, Vertex2d, Vertex3d } from "../models/types/basicGeometries"
 import { VectorUtils } from "./vectorUtils"
 import { LineEvaluation } from "./lineEvaluationUtils"
-import { ActionResult } from "models/types/errorMessages"
+import { ActionResult } from "../models/types/errorMessages"
 
 const ZERO_VECTOR_TOLERANCE = 1e-6;
 const UNIT_VECTOR_TOLERANCE = 1e-6;

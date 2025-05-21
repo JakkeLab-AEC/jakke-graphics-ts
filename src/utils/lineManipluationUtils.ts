@@ -1,4 +1,4 @@
-import { Line } from "models/types/basicGeometries";
+import { Line } from "../models/types/basicGeometries";
 import { VectorUtils } from "./vectorUtils";
 
 type Direction = 'left'|'right';

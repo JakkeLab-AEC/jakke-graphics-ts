@@ -21,3 +21,6 @@ export type BoundingBox3d = {
         n: number,
     }
 }
+
+export type Polyline2d = Vertex2d[];
+export type Polyline3d = Vertex3d[];
