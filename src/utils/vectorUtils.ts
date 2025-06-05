@@ -1,4 +1,4 @@
-import { Line, Vertex3d } from "../models/types/basicGeometries";
+import { Line, Vertex2d, Vertex3d } from "../models/types/basicGeometries";
 
 const TOLERANCE_PARALLEL = 1e-6;
 
@@ -100,6 +100,14 @@ function getDist(v0: Vertex3d, v1: Vertex3d): number {
     return Math.sqrt((v1.x - v0.x) ** 2 + (v1.y - v0.y) ** 2 + (v1.z - v0.z) ** 2);
 }
 
+function is2d(v: Vertex2d | Vertex3d) {
+    return 'z' in v && typeof v.z === 'number';
+}
+
+function to3d(v: Vertex2d): Vertex3d {
+    return {...v, z: 0};
+}
+
 function chain(initial: Vertex3d): VectorChain {
     let current = { ...initial };
 
@@ -181,5 +189,7 @@ export const VectorUtils = {
     rotateOnXY,
     rotateOnYZ,
     rotateOnXZ,
-    chain
+    is2d,
+    to3d,
+    chain,
 };

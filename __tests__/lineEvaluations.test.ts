@@ -1,5 +1,5 @@
 import { Line } from "../models/types/basicGeometries";
-import { LineEvaluation } from "../utils/lineEvaluationUtils";
+import { LineEvaluation } from "../../utils/lineEvaluationUtils";
 
 const TESTER_PORT = 3355;
 const TESTER_ADDRESS = 'ws://localhost';

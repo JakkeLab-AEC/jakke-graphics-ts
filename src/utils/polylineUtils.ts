@@ -3,166 +3,117 @@ import { LineEvaluation } from "./lineEvaluationUtils";
 import { VectorUtils } from "./vectorUtils";
 
 const POLYLINE_CLOSED_TOLERANCE = 1e-6;
+const POLYLINE_ZERO_LENGTH = 1e-6;
 
 function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnds = false): {pt: Vertex2d, t: number}|undefined {
-    const ptFrom = {...pt, z: 0};
-    const plStart = {...polyline[0], z: 0};
-    const plEnd = {...polyline[polyline.length - 1], z: 0};
+    // Filter when polyline is actually a point or line.
+    if(polyline.length < 3) return;
+    
+    // Filter when polyline is actually no length.
+    const poylineLength = getLengthPolyline2d(polyline);
+    if(poylineLength < POLYLINE_ZERO_LENGTH) return;
 
-    const isClosed = VectorUtils.getDist(plStart, plEnd) <= POLYLINE_CLOSED_TOLERANCE;
-
-    let tValue: number|undefined;
-    let ptFooting: Vertex3d|undefined;
-    let dist: number|undefined = -1;
+    // Loop the polyline
+    const factors: EvaluationFactorInternal[] = [];
+    const ptFrom = VectorUtils.to3d(pt);
+    let lengthSum = 0;
     for(let i = 0; i < polyline.length - 1; i++) {
-        const p0 = polyline[i];
-        const p1 = polyline[i+1];
-
-        const line: Line = {p0: {...p0, z: 0}, p1: {...p1, z: 0}};
-        const foot = LineEvaluation.getFootPointOnLine(line, ptFrom);
-        if(!ptFooting || !tValue) {
-            if(foot && 0 <= foot.t && foot.t <= 1) {
-                ptFooting = foot.pt;
-                tValue = i + foot.t;
-                dist = VectorUtils.getDist(ptFrom, foot.pt);
-            }
-        } else {
-            if(foot && 0 <= foot.t && foot.t <= 1) {
-                const newDist = VectorUtils.getDist(ptFrom, foot.pt);
-                if(newDist < dist) {
-                    ptFooting = foot.pt;
-                    tValue = i + foot.t;
-                    dist = newDist;
-                }
-            }
+        const p0 = VectorUtils.to3d(polyline[i]);
+        const p1 = VectorUtils.to3d(polyline[i+1]);
+        if(i > 0) {
+            lengthSum += VectorUtils.getDist(p0, p1);
         }
-    }
+        
+        const lineSegment: Line = {p0: p0, p1: p1};
+        const param = LineEvaluation.getFootPointOnLine(lineSegment, ptFrom);
+        if(!param) continue;
 
-    if(includeEnds) {
-        if(isClosed) {
-            const distToStart = VectorUtils.getDist(ptFrom, plStart);
-            const tToStart = 0;
-            if(distToStart < dist) {
-                tValue = tToStart;
-                ptFooting = plStart;
-            }
-        } else {
-            const distToStart = VectorUtils.getDist(ptFrom, plStart);
-            const distToEnd = VectorUtils.getDist(ptFrom, plEnd);
-            const tToStart = 0;
-            const tToEnd = polyline.length;
-
-            if(tValue && ptFooting) {
-                const comparablesSorted: {dist: number, t: number, pt: Vertex3d}[] = [
-                    {dist: dist, t: tValue, pt: ptFooting},
-                    {dist: distToStart, t: tToStart, pt: plStart},
-                    {dist: distToEnd, t: tToEnd, pt: plEnd},
-                ].sort((a, b) => a.dist - b.dist);
-                
-                tValue = comparablesSorted[0].t;
-                pt = comparablesSorted[0].pt;
-            } else {
-                const comparablesSorted: {dist: number, t: number, pt: Vertex3d}[] = [
-                    {dist: distToStart, t: tToStart, pt: plStart},
-                    {dist: distToEnd, t: tToEnd, pt: plEnd},
-                ].sort((a, b) => a.dist - b.dist);
-                
-                tValue = comparablesSorted[0].t;
-                pt = comparablesSorted[0].pt;
-            }
-        }
-    }
-
-    if(ptFooting && tValue) {
-        return {
-            pt: ptFooting,
-            t: tValue
-        }
+        const distOnSegment = VectorUtils.getDist(lineSegment.p0, param.pt);
+        factors.push({
+            travelDistanceOnPolyline: lengthSum + distOnSegment,
+            distToFooting: VectorUtils.getDist(ptFrom, param.pt),
+            pt: param.pt,
+            t: param.t
+        });
     }
     
-    return;
+    factors.sort((a, b) => a.distToFooting - b.distToFooting 
+        || a.travelDistanceOnPolyline - b.travelDistanceOnPolyline
+        || a.t - b.t
+    );
+
+    const target = factors[0];
+    return {
+        pt: target.pt,
+        t: target.travelDistanceOnPolyline / poylineLength
+    };
 }
 
+type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number}
 function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnds = false): {pt: Vertex3d, t: number}|undefined {
-    const ptFrom = pt;
-    const plStart = polyline[0];
-    const plEnd = polyline[polyline.length - 1];
+    // Filter when polyline is actually a point or line.
+    if(polyline.length < 3) return;
+    
+    // Filter when polyline is actually no length.
+    const poylineLength = getLengthPolyline3d(polyline);
+    if(poylineLength < POLYLINE_ZERO_LENGTH) return;
 
-    const isClosed = VectorUtils.getDist(plStart, plEnd) <= POLYLINE_CLOSED_TOLERANCE;
-
-    let tValue: number|undefined;
-    let ptFooting: Vertex3d|undefined;
-    let dist: number|undefined = -1;
+    // Loop the polyline
+    const factors: EvaluationFactorInternal[] = [];
+    let lengthSum = 0;
     for(let i = 0; i < polyline.length - 1; i++) {
-        const p0 = polyline[i];
-        const p1 = polyline[i+1];
-
-        const line: Line = {p0, p1};
-        const foot = LineEvaluation.getFootPointOnLine(line, ptFrom);
-        if(!ptFooting || !tValue) {
-            if(foot && 0 <= foot.t && foot.t <= 1) {
-                ptFooting = foot.pt;
-                tValue = i + foot.t;
-                dist = VectorUtils.getDist(ptFrom, foot.pt);
-            }
-        } else {
-            if(foot && 0 <= foot.t && foot.t <= 1) {
-                const newDist = VectorUtils.getDist(ptFrom, foot.pt);
-                if(newDist < dist) {
-                    ptFooting = foot.pt;
-                    tValue = i + foot.t;
-                    dist = newDist;
-                }
-            }
+        if(i > 0) {
+            lengthSum += VectorUtils.getDist(polyline[i-1], polyline[i]);
         }
-    }
+        
+        const lineSegment: Line = {p0: polyline[i], p1: polyline[i+1]};
+        const param = LineEvaluation.getFootPointOnLine(lineSegment, pt);
+        if(!param) continue;
 
-    if(includeEnds) {
-        if(isClosed) {
-            const distToStart = VectorUtils.getDist(ptFrom, plStart);
-            const tToStart = 0;
-            if(distToStart < dist) {
-                tValue = tToStart;
-                ptFooting = plStart;
-            }
-        } else {
-            const distToStart = VectorUtils.getDist(ptFrom, plStart);
-            const distToEnd = VectorUtils.getDist(ptFrom, plEnd);
-            const tToStart = 0;
-            const tToEnd = polyline.length;
-
-            if(tValue && ptFooting) {
-                const comparablesSorted: {dist: number, t: number, pt: Vertex3d}[] = [
-                    {dist: dist, t: tValue, pt: ptFooting},
-                    {dist: distToStart, t: tToStart, pt: plStart},
-                    {dist: distToEnd, t: tToEnd, pt: plEnd},
-                ].sort((a, b) => a.dist - b.dist);
-                
-                tValue = comparablesSorted[0].t;
-                pt = comparablesSorted[0].pt;
-            } else {
-                const comparablesSorted: {dist: number, t: number, pt: Vertex3d}[] = [
-                    {dist: distToStart, t: tToStart, pt: plStart},
-                    {dist: distToEnd, t: tToEnd, pt: plEnd},
-                ].sort((a, b) => a.dist - b.dist);
-                
-                tValue = comparablesSorted[0].t;
-                pt = comparablesSorted[0].pt;
-            }
-        }
-    }
-
-    if(ptFooting && tValue) {
-        return {
-            pt: ptFooting,
-            t: tValue
-        }
+        const distOnSegment = VectorUtils.getDist(lineSegment.p0, param.pt);
+        factors.push({
+            travelDistanceOnPolyline: lengthSum + distOnSegment,
+            distToFooting: VectorUtils.getDist(pt, param.pt),
+            pt: param.pt,
+            t: param.t
+        });
     }
     
-    return;
+    factors.sort((a, b) => a.distToFooting - b.distToFooting 
+        || a.travelDistanceOnPolyline - b.travelDistanceOnPolyline
+        || a.t - b.t
+    );
+
+    const target = factors[0];
+    return {
+        pt: target.pt,
+        t: target.travelDistanceOnPolyline / poylineLength
+    };
+}
+
+function getLengthPolyline2d(polyline: Polyline2d): number {
+    let sum = 0;
+    for(let i = 0; i < polyline.length - 1; i++) {
+        const p0 = {...polyline[i], z: 0};
+        const p1 = {...polyline[i+1], z: 0};
+        sum += VectorUtils.getDist(p0, p1);
+    }
+    
+    return sum;
+}
+
+function getLengthPolyline3d(polyline: Polyline3d): number {
+    let sum = 0;
+    for(let i = 0; i < polyline.length - 1; i++) {
+        sum += VectorUtils.getDist(polyline[i], polyline[i+1]);
+    }
+    
+    return sum;
 }
 
 export const PolylineUtils = {
     footingPointOnPolyline2d,
-    footingPointOnPolyline3d
+    footingPointOnPolyline3d,
+    getLengthPolyline2d,
+    getLengthPolyline3d
 }
