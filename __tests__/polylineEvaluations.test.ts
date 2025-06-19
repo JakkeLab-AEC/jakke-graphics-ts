@@ -1,4 +1,4 @@
-import { Polyline2d, Polyline3d, Vertex2d, Vertex3d } from '../src/models/types/basicGeometries';
+import { Line, Polyline2d, Polyline3d, Vertex2d, Vertex3d } from '../src/models/types/basicGeometries';
 import { PolylineUtils } from '../src/utils/polylineUtils';
 
 describe('Test Polyline Utils', () => {
@@ -55,6 +55,24 @@ describe('Test Polyline Utils', () => {
             console.log(footing);
         });  
         
+        expect(true).toBe(true);
+    });
+
+    test('Test getting intersection within polyline and line', () => {
+        const TEST_POLYLINE: Polyline3d = [
+            {x: 0, y: 0, z: 0},
+            {x: 10, y: 10, z: 0},
+            {x: 10, y: 0, z: 0},
+        ];
+
+        const TEST_LINE:Line = {
+            p0: {x: 0, y: 5, z: 0},
+            p1: {x: 10, y: 5, z: 0},
+        };
+
+        const result = PolylineUtils.getIntersectionWithLine(TEST_POLYLINE, TEST_LINE);
+        console.log(result.length);
+
         expect(true).toBe(true);
     });
 });

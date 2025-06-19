@@ -5,6 +5,8 @@ import { VectorUtils } from "./vectorUtils";
 const POLYLINE_CLOSED_TOLERANCE = 1e-6;
 const POLYLINE_ZERO_LENGTH = 1e-6;
 
+type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number}
+
 function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnds = false): {pt: Vertex2d, t: number}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 3) return;
@@ -49,7 +51,6 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnd
     };
 }
 
-type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number}
 function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnds = false): {pt: Vertex3d, t: number}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 3) return;
@@ -111,9 +112,25 @@ function getLengthPolyline3d(polyline: Polyline3d): number {
     return sum;
 }
 
+function getIntersectionWithLine(polyline: Polyline3d, line: Line) {
+    const pts: {pt: Vertex3d, t: number}[] = [];
+    for(let i = 0; i < polyline.length - 1; i++) {
+        const segment: Line = {p0: polyline[i], p1: polyline[i+1]};
+        const test = LineEvaluation.getIntersection(segment, line);
+        
+        if(test.result && test.pt) {
+            const t = LineEvaluation.getParameterOnLine(line.p0, line.p1, test.pt);
+            pts.push({pt: test.pt, t});
+        }
+    }
+
+    return pts.sort((a, b) => a.t - b.t);
+}
+
 export const PolylineUtils = {
     footingPointOnPolyline2d,
     footingPointOnPolyline3d,
     getLengthPolyline2d,
-    getLengthPolyline3d
+    getLengthPolyline3d,
+    getIntersectionWithLine
 }

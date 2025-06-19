@@ -134,8 +134,6 @@ function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: b
         const paramPtQ2 = getParameterOnLine(li0.p0, li0.p1, ptQ2);
         const paramPtR2 = getParameterOnLine(li1.p0, li1.p1, ptR2);
 
-        console.log(`param PtQ2: ${paramPtQ2}, param PtR2: ${paramPtR2}`);
-
         if((-TOLERANCE_LINE_EVALUATION <= paramPtQ2 && paramPtQ2 <= 1 + TOLERANCE_LINE_EVALUATION) && 
            (-TOLERANCE_LINE_EVALUATION <= paramPtR2 && paramPtR2 <= 1 + TOLERANCE_LINE_EVALUATION)) {
             return {result: true, pt: ptQ2};
