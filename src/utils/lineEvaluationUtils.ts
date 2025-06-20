@@ -63,8 +63,9 @@ function getIntersection(li0: Line, li1: Line, fromExtended = false): {result: b
     });
 
     const det = -(d0PlaneXY.x * d1PlaneXY.y) + (d1PlaneXY.x * d0PlaneXY.y);
-    const detAbs = Math.abs(Math.abs(det) - 1);
-    if(detAbs > TOLERANCE_LINE_EVALUATION) return {result: false, message: "Det is zero."};
+    if (Math.abs(det) < TOLERANCE_LINE_EVALUATION) {
+        return {result: false, message: "Det is zero (parallel lines)"};
+    }
 
     const dx = p1p3.x;
     const dy = p1p3.y;

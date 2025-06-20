@@ -71,7 +71,7 @@ describe('Test Polyline Utils', () => {
         };
 
         const result = PolylineUtils.getIntersectionWithLine(TEST_POLYLINE, TEST_LINE);
-        console.log(result.length);
+        console.log(result);
 
         expect(true).toBe(true);
     });
