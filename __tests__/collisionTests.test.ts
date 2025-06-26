@@ -44,7 +44,7 @@ describe('Collision Tests', () => {
         expect(collisionCheck.result).toBe(true);
     });
 
-    test('Collision Test Line and Triangle', () => {
+    test('Collision Test Line and Triangle Edge', () => {
         const line: Line = {
             p0: {x: 0, y: 5, z: 0},
             p1: {x: 15, y: 5, z: 0},
@@ -57,6 +57,22 @@ describe('Collision Tests', () => {
         }
 
         const collisions = CollisionUtils.getCollisionLineWithTriangleEdges(line, triangle);
+        console.log(collisions);
+    });
+
+    test('Collision Test Line and Triangle Surface', () => {
+        const line: Line = {
+            p0: {x: 0, y: 5, z: 10},
+            p1: {x: 15, y: 5, z: 0},
+        }
+
+        const triangle: Triangle = {
+            p0: {x: 0, y: 0, z: 0},
+            p1: {x: 10, y: 0, z: 10},
+            p2: {x: 10, y: 10, z: 10},
+        }
+
+        const collisions = CollisionUtils.getCollisionLineWithTriangleSurface(line, triangle);
         console.log(collisions);
     });
 });
