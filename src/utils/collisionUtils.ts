@@ -1,4 +1,4 @@
-import { BoundingBox2d, BoundingBox3d, Vertex2d, Vertex3d } from "../models/types/basicGeometries"
+import { BoundingBox2d, BoundingBox3d, Line, Triangle, Vertex2d, Vertex3d } from "../models/types/basicGeometries"
 import { VectorUtils } from "./vectorUtils"
 import { LineEvaluation } from "./lineEvaluationUtils"
 import { ActionResult } from "../models/types/errorMessages"
@@ -204,7 +204,29 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
     }
 }
 
+function getCollisionLineWithTriangleEdges(line: Line, triangle: Triangle) {
+    const AB: Line = {p0: triangle.p0, p1: triangle.p1};
+    const BC: Line = {p0: triangle.p1, p1: triangle.p2};
+    const CA: Line = {p0: triangle.p2, p1: triangle.p0};
+
+    const intersectionOnAB = LineEvaluation.getIntersection(line, AB);
+    const intersectionOnBC = LineEvaluation.getIntersection(line, BC);
+    const intersectionOnCA = LineEvaluation.getIntersection(line, CA);
+
+    const pts: Vertex3d[] = [];
+    if(intersectionOnAB.result && intersectionOnAB.pt) pts.push(intersectionOnAB.pt);
+    if(intersectionOnBC.result && intersectionOnBC.pt) pts.push(intersectionOnBC.pt);
+    if(intersectionOnCA.result && intersectionOnCA.pt) pts.push(intersectionOnCA.pt);
+
+    const sortedPts = pts.map(p => {
+        return {t: LineEvaluation.getParameterOnLine(line.p0, line.p1, p), p}
+    }).sort((a, b) => a.t - b.t);
+
+    return sortedPts;
+}
+
 export const CollisionUtils = {
     hasBoundingBoxCollision2d,
-    hasBoundingBoxCollision3d
+    hasBoundingBoxCollision3d,
+    getCollisionLineWithTriangleEdges
 }

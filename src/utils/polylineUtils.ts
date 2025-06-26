@@ -132,5 +132,5 @@ export const PolylineUtils = {
     footingPointOnPolyline3d,
     getLengthPolyline2d,
     getLengthPolyline3d,
-    getIntersectionWithLine
+    getIntersectionWithLine,
 }
