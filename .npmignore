@@ -1,5 +1,22 @@
-src/
-node_modules/
+# Ignore test folders and configs
 __tests__/
-README.md
+*.test.*
+*.spec.*
+jest.config.*
+vite.config.*
+
+# Ignore development configs
+tsconfig.json
+tsconfig.*.json
+pack.config.js
 *.log
+
+# Ignore sources and temporary folders
+src/
+packed/
+node_modules/
+
+# Ignore meta files
+README.md
+.npmignore
+.gitignore
