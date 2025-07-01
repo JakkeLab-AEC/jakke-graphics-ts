@@ -9,7 +9,7 @@ type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting
 
 function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnds = false): {pt: Vertex2d, t: number}|undefined {
     // Filter when polyline is actually a point or line.
-    if(polyline.length < 3) return;
+    if(polyline.length < 2) return;
     
     // Filter when polyline is actually no length.
     const poylineLength = getLengthPolyline2d(polyline);
@@ -23,7 +23,8 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnd
         const p0 = VectorUtils.to3d(polyline[i]);
         const p1 = VectorUtils.to3d(polyline[i+1]);
         if(i > 0) {
-            lengthSum += VectorUtils.getDist(p0, p1);
+            const pFormer = VectorUtils.to3d(polyline[i-1]);
+            lengthSum += VectorUtils.getDist(pFormer, p0);
         }
         
         const lineSegment: Line = {p0: p0, p1: p1};
@@ -53,7 +54,7 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnd
 
 function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnds = false): {pt: Vertex3d, t: number}|undefined {
     // Filter when polyline is actually a point or line.
-    if(polyline.length < 3) return;
+    if(polyline.length < 2) return;
     
     // Filter when polyline is actually no length.
     const poylineLength = getLengthPolyline3d(polyline);
@@ -132,5 +133,5 @@ export const PolylineUtils = {
     footingPointOnPolyline3d,
     getLengthPolyline2d,
     getLengthPolyline3d,
-    getIntersectionWithLine
+    getIntersectionWithLine,
 }

@@ -1,4 +1,4 @@
-import { BoundingBox2d, BoundingBox3d } from "../src/models/types/basicGeometries";
+import { BoundingBox2d, BoundingBox3d, Line, Triangle } from "../src/models/types/basicGeometries";
 import { CollisionUtils } from "../src/utils/collisionUtils";
 
 describe('Collision Tests', () => {
@@ -22,7 +22,7 @@ describe('Collision Tests', () => {
         expect(collisionCheck.result).toBe(true);
     });
 
-    test('Collision Test 3d, when mees at a side', () => {
+    test('Collision Test 3d, when meets at a side', () => {
         const boxA: BoundingBox3d = {
             anchor: { x: 0, y: 0, z: 0 },
             uAxis: { x: 1, y: 0, z: 0 },
@@ -42,5 +42,37 @@ describe('Collision Tests', () => {
         console.log(collisionCheck.args);
 
         expect(collisionCheck.result).toBe(true);
+    });
+
+    test('Collision Test Line and Triangle Edge', () => {
+        const line: Line = {
+            p0: {x: 0, y: 5, z: 0},
+            p1: {x: 15, y: 5, z: 0},
+        }
+
+        const triangle: Triangle = {
+            p0: {x: 0, y: 0, z: 0},
+            p1: {x: 10, y: 0, z: 0},
+            p2: {x: 10, y: 10, z: 0},
+        }
+
+        const collisions = CollisionUtils.getCollisionLineWithTriangleEdges(line, triangle);
+        console.log(collisions);
+    });
+
+    test('Collision Test Line and Triangle Surface', () => {
+        const line: Line = {
+            p0: {x: 0, y: 5, z: 10},
+            p1: {x: 15, y: 5, z: 0},
+        }
+
+        const triangle: Triangle = {
+            p0: {x: 0, y: 0, z: 0},
+            p1: {x: 10, y: 0, z: 10},
+            p2: {x: 10, y: 10, z: 10},
+        }
+
+        const collisions = CollisionUtils.getCollisionLineWithTriangleSurface(line, triangle);
+        console.log(collisions);
     });
 });

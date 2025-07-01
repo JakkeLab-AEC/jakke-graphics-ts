@@ -1,4 +1,4 @@
-import { BoundingBox2d, BoundingBox3d, Vertex2d, Vertex3d } from "../models/types/basicGeometries"
+import { BoundingBox2d, BoundingBox3d, Line, Triangle, Vertex2d, Vertex3d } from "../models/types/basicGeometries"
 import { VectorUtils } from "./vectorUtils"
 import { LineEvaluation } from "./lineEvaluationUtils"
 import { ActionResult } from "../models/types/errorMessages"
@@ -204,7 +204,69 @@ function hasBoundingBoxCollision3d(boxA: BoundingBox3d, boxB: BoundingBox3d, inc
     }
 }
 
+function getCollisionLineWithTriangleEdges(line: Line, triangle: Triangle) {
+    const AB: Line = {p0: triangle.p0, p1: triangle.p1};
+    const BC: Line = {p0: triangle.p1, p1: triangle.p2};
+    const CA: Line = {p0: triangle.p2, p1: triangle.p0};
+
+    const intersectionOnAB = LineEvaluation.getIntersection(line, AB);
+    const intersectionOnBC = LineEvaluation.getIntersection(line, BC);
+    const intersectionOnCA = LineEvaluation.getIntersection(line, CA);
+
+    const pts: Vertex3d[] = [];
+    if(intersectionOnAB.result && intersectionOnAB.pt) pts.push(intersectionOnAB.pt);
+    if(intersectionOnBC.result && intersectionOnBC.pt) pts.push(intersectionOnBC.pt);
+    if(intersectionOnCA.result && intersectionOnCA.pt) pts.push(intersectionOnCA.pt);
+
+    const sortedPts = pts.map(p => {
+        return {t: LineEvaluation.getParameterOnLine(line.p0, line.p1, p), p}
+    }).sort((a, b) => a.t - b.t);
+
+    return sortedPts;
+}
+
+function getCollisionLineWithTriangleSurface(line: Line, triangle: Triangle): Vertex3d | undefined {
+    if(isDetZero(line, triangle)) return;
+
+    const v0 = triangle.p0;
+    const v1 = triangle.p1;
+    const v2 = triangle.p2;
+
+    const p0 = line.p0;
+    const p1 = line.p1;
+
+    const v0v1 = VectorUtils.subtract(v1, v0);
+    const v0v2 = VectorUtils.subtract(v2, v0);
+    const v0p0 = VectorUtils.subtract(p0, v0);
+    const d = VectorUtils.chain(p1).subtract(p0).normalize().value();
+
+    const det = VectorUtils.dot(v0v1, VectorUtils.cross(d, v0v2));
+
+    const v = VectorUtils.dot(d, VectorUtils.cross(v0v2, v0p0)) / det
+    const w = VectorUtils.dot(d, VectorUtils.cross(v0p0, v0v1)) / det
+    const u = 1 - (v + w);
+
+    const result = VectorUtils.chain(v0)
+        .scale(u)
+        .add(VectorUtils.scale(v1, v))
+        .add(VectorUtils.scale(v2, w))
+        .value();
+
+    const validParams = [u, v, w].every(val => val >= 0 && val <= 1);
+    return validParams ? result : undefined;
+}
+
+function isDetZero(line: Line, triangle: Triangle) {
+    const v0v1 = VectorUtils.subtract(triangle.p1, triangle.p0);
+    const v0v2 = VectorUtils.subtract(triangle.p2, triangle.p0);
+    const d = VectorUtils.subtract(line.p1, line.p0);
+    const det = VectorUtils.dot(v0v1, VectorUtils.cross(d, v0v2));
+    return det === 0;
+}
+
 export const CollisionUtils = {
     hasBoundingBoxCollision2d,
-    hasBoundingBoxCollision3d
+    hasBoundingBoxCollision3d,
+    getCollisionLineWithTriangleEdges,
+    getCollisionLineWithTriangleSurface
 }
