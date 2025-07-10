@@ -7,7 +7,7 @@ const POLYLINE_ZERO_LENGTH = 1e-6;
 
 type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number}
 
-function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnds = false): {pt: Vertex2d, t: number}|undefined {
+function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, availableFactors: EvaluationFactorInternal[]}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 2) return;
     
@@ -32,12 +32,23 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnd
         if(!param) continue;
 
         const distOnSegment = VectorUtils.getDist(lineSegment.p0, param.pt);
-        factors.push({
-            travelDistanceOnPolyline: lengthSum + distOnSegment,
-            distToFooting: VectorUtils.getDist(ptFrom, param.pt),
-            pt: param.pt,
-            t: param.t
-        });
+        if(withinCurve) {
+            if(0 <= param.t && param.t <= 1) {
+                factors.push({
+                    travelDistanceOnPolyline: lengthSum + distOnSegment,
+                    distToFooting: VectorUtils.getDist(ptFrom, param.pt),
+                    pt: param.pt,
+                    t: param.t
+                });
+            }
+        } else {
+            factors.push({
+                travelDistanceOnPolyline: lengthSum + distOnSegment,
+                distToFooting: VectorUtils.getDist(ptFrom, param.pt),
+                pt: param.pt,
+                t: param.t
+            });
+        }
     }
     
     factors.sort((a, b) => a.distToFooting - b.distToFooting 
@@ -48,7 +59,8 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, includeEnd
     const target = factors[0];
     return {
         pt: target.pt,
-        t: target.travelDistanceOnPolyline / poylineLength
+        t: target.travelDistanceOnPolyline / poylineLength,
+        availableFactors: factors
     };
 }
 
