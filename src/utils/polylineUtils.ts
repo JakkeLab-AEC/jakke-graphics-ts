@@ -5,9 +5,9 @@ import { VectorUtils } from "./vectorUtils";
 const POLYLINE_CLOSED_TOLERANCE = 1e-6;
 const POLYLINE_ZERO_LENGTH = 1e-6;
 
-type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number}
+type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number, lineSegment: Line}
 
-function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, availableFactors: EvaluationFactorInternal[]}|undefined {
+function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, lineSegment: Line, availableFactors: EvaluationFactorInternal[]}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 2) return;
     
@@ -38,7 +38,8 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
                     travelDistanceOnPolyline: lengthSum + distOnSegment,
                     distToFooting: VectorUtils.getDist(ptFrom, param.pt),
                     pt: param.pt,
-                    t: param.t
+                    t: param.t,
+                    lineSegment
                 });
             }
         } else {
@@ -46,7 +47,8 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
                 travelDistanceOnPolyline: lengthSum + distOnSegment,
                 distToFooting: VectorUtils.getDist(ptFrom, param.pt),
                 pt: param.pt,
-                t: param.t
+                t: param.t,
+                lineSegment
             });
         }
     }
@@ -60,11 +62,12 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
     return {
         pt: target.pt,
         t: target.travelDistanceOnPolyline / poylineLength,
+        lineSegment: target.lineSegment,
         availableFactors: factors
     };
 }
 
-function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnds = false): {pt: Vertex3d, t: number}|undefined {
+function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnds = false): {pt: Vertex3d, t: number, lineSegment: Line}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 2) return;
     
@@ -89,7 +92,8 @@ function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnd
             travelDistanceOnPolyline: lengthSum + distOnSegment,
             distToFooting: VectorUtils.getDist(pt, param.pt),
             pt: param.pt,
-            t: param.t
+            t: param.t,
+            lineSegment
         });
     }
     
@@ -101,7 +105,8 @@ function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnd
     const target = factors[0];
     return {
         pt: target.pt,
-        t: target.travelDistanceOnPolyline / poylineLength
+        t: target.travelDistanceOnPolyline / poylineLength,
+        lineSegment: target.lineSegment
     };
 }
 
