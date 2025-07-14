@@ -21,6 +21,7 @@
   ],
   "author": "JakkeLab",
   "license": "MIT",
+  "description": "",
   "repository": {
     "type": "git",
     "url" : "https://github.com/JakkeLab-AEC/jakke-graphics-ts"
