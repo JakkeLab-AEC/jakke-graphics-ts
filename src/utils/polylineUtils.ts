@@ -12,8 +12,8 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
     if(polyline.length < 2) return;
     
     // Filter when polyline is actually no length.
-    const poylineLength = getLengthPolyline2d(polyline);
-    if(poylineLength < POLYLINE_ZERO_LENGTH) return;
+    const polylineLength = getLengthPolyline2d(polyline);
+    if(polylineLength < POLYLINE_ZERO_LENGTH) return;
 
     // Loop the polyline
     const factors: EvaluationFactorInternal[] = [];
@@ -38,7 +38,7 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
                     travelDistanceOnPolyline: lengthSum + distOnSegment,
                     distToFooting: VectorUtils.getDist(ptFrom, param.pt),
                     pt: param.pt,
-                    t: param.t,
+                    t: (lengthSum + distOnSegment) / polylineLength,
                     lineSegment
                 });
             }
@@ -47,21 +47,20 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
                 travelDistanceOnPolyline: lengthSum + distOnSegment,
                 distToFooting: VectorUtils.getDist(ptFrom, param.pt),
                 pt: param.pt,
-                t: param.t,
+                t: (lengthSum + distOnSegment) / polylineLength,
                 lineSegment
             });
         }
     }
     
-    factors.sort((a, b) => a.distToFooting - b.distToFooting 
-        || a.travelDistanceOnPolyline - b.travelDistanceOnPolyline
+    factors.sort((a, b) => a.distToFooting - b.distToFooting
         || a.t - b.t
     );
 
     const target = factors[0];
     return {
         pt: target.pt,
-        t: target.travelDistanceOnPolyline / poylineLength,
+        t: target.travelDistanceOnPolyline / polylineLength,
         lineSegment: target.lineSegment,
         availableFactors: factors
     };
