@@ -201,9 +201,9 @@ function getFootPointOnLine(line: Line, pt: Vertex3d): {pt: Vertex3d, t: number}
     if(dSize === 0) return;
 
     const dot = VectorUtils.dot(norm, ptMoved);
-    const t = dot / Math.pow(dSize, 2);
+    const t = dot / VectorUtils.getSize(direction);
     
-    const ptOnMovedLine = VectorUtils.scale(norm, t);
+    const ptOnMovedLine = VectorUtils.scale(norm, dot);
     const ptFooting = VectorUtils.add(ptOnMovedLine, anchor);
     return {pt: ptFooting, t};
 }
