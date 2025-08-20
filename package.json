@@ -1,10 +1,12 @@
 {
   "name": "jakke-graphics-ts",
-  "version": "0.0.4",
-  "description": "2D, 3D geometry and graphics utility library for TypeScript projects.",
+  "version": "0.0.5",
+  "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "node pack.config.js"
   },
@@ -21,10 +23,9 @@
   ],
   "author": "JakkeLab",
   "license": "MIT",
-  "description": "",
   "repository": {
     "type": "git",
-    "url" : "https://github.com/JakkeLab-AEC/jakke-graphics-ts"
+    "url": "https://github.com/JakkeLab-AEC/jakke-graphics-ts"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
