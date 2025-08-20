@@ -1,6 +1,6 @@
 {
   "name": "jakke-graphics-ts",
-  "version": "0.0.3",
+  "version": "0.0.7",
   "description": "2D, 3D geometry and graphics utility library for TypeScript projects.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

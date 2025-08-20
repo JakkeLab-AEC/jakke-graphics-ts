@@ -5,9 +5,9 @@ import { VectorUtils } from "./vectorUtils";
 const POLYLINE_CLOSED_TOLERANCE = 1e-6;
 const POLYLINE_ZERO_LENGTH = 1e-6;
 
-type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number, lineSegment: Line}
+export type Polyline2dEvaluationFactor = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number, lineSegment: Line}
 
-function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, lineSegment: Line, availableFactors: EvaluationFactorInternal[]}|undefined {
+function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, lineSegment: Line, availableFactors: Polyline2dEvaluationFactor[]}|undefined {
     // Filter when polyline is actually a point or line.
     if(polyline.length < 2) return;
     
@@ -16,7 +16,7 @@ function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurv
     if(polylineLength < POLYLINE_ZERO_LENGTH) return;
 
     // Loop the polyline
-    const factors: EvaluationFactorInternal[] = [];
+    const factors: Polyline2dEvaluationFactor[] = [];
     const ptFrom = VectorUtils.to3d(pt);
     let lengthSum = 0;
     for(let i = 0; i < polyline.length - 1; i++) {
@@ -75,7 +75,7 @@ function footingPointOnPolyline3d(polyline: Polyline3d, pt: Vertex3d, includeEnd
     if(poylineLength < POLYLINE_ZERO_LENGTH) return;
 
     // Loop the polyline
-    const factors: EvaluationFactorInternal[] = [];
+    const factors: Polyline2dEvaluationFactor[] = [];
     let lengthSum = 0;
     for(let i = 0; i < polyline.length - 1; i++) {
         if(i > 0) {
