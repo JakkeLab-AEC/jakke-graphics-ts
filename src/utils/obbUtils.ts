@@ -23,11 +23,14 @@ export function computeOBB2d(vertices: Vertex3d[]): { p0: Vertex3d, p1: Vertex3d
 
         const p1Direction = Math.atan2(p1Moved.y, p1Moved.x);
 
+        // Get rotation angle
+        const rotationAngle = -p1Direction;
+        
         const ptsTransformed: Vertex3d[] = hull.map((pt) => {
             const ptMoved: Vertex3d = {x: pt.x - p0.x, y: pt.y - p0.y, z: pt.z};
             const ptTransformed: Vertex3d = {
-                x: Math.cos(-p1Direction)*ptMoved.x - Math.sin(-p1Direction)*ptMoved.y,
-                y: Math.sin(-p1Direction)*ptMoved.x - Math.cos(-p1Direction)*ptMoved.y,
+                x: Math.cos(rotationAngle) * ptMoved.x - Math.sin(rotationAngle) * ptMoved.y,
+                y: Math.sin(rotationAngle) * ptMoved.x + Math.cos(rotationAngle) * ptMoved.y,
                 z: pt.z
             } 
             
@@ -36,32 +39,37 @@ export function computeOBB2d(vertices: Vertex3d[]): { p0: Vertex3d, p1: Vertex3d
 
         const bb = getBoundingBox(ptsTransformed);
 
-        comparables.push({area: bb.area, p0, p1, rotation: p1Direction, pts: bb.pts});
+        comparables.push({area: bb.area, p0, p1, rotation: rotationAngle, pts: bb.pts});
     }
 
     const sortedBoundingBoxes = comparables.sort((a, b) => a.area - b.area);
     const minBB = sortedBoundingBoxes[0];
     const rotation = minBB.rotation;
 
-    const restoredPts:Vertex3d[] = minBB.pts.map(pt => {
+    const restoredPts: Vertex3d[] = minBB.pts.map(pt => {
+        // Set rotation angle as reverse
+        const reverseRotation = -rotation;
         const ptTransformed: Vertex3d = {
-            x: Math.cos(rotation)*pt.x - Math.sin(rotation)*pt.y + minBB.p0.x,
-            y: Math.sin(rotation)*pt.x - Math.cos(rotation)*pt.y + minBB.p0.y,
+            x: Math.cos(reverseRotation) * pt.x - Math.sin(reverseRotation) * pt.y + minBB.p0.x,
+            y: Math.sin(reverseRotation) * pt.x + Math.cos(reverseRotation) * pt.y + minBB.p0.y,
             z: pt.z
         }
 
         return ptTransformed;
     });
 
+    // Sort pts : p0 is bottom left one, and sort as counterclockwise.
+    const sortedPts = sortVerticesCounterClockwise(restoredPts);
+
     return {
-        p0: restoredPts[0],
-        p1: restoredPts[1],
-        p2: restoredPts[2],
-        p3: restoredPts[3],
+        p0: sortedPts[0],
+        p1: sortedPts[1],
+        p2: sortedPts[2],
+        p3: sortedPts[3],
     }
 }
 
-function getBoundingBox(pts: Vertex3d[]):{area: number, pts: Vertex3d[]} {
+function getBoundingBox(pts: Vertex3d[]): {area: number, pts: Vertex3d[]} {
     const xMin = Math.min(...pts.map(p => p.x));
     const yMin = Math.min(...pts.map(p => p.y));
     const xMax = Math.max(...pts.map(p => p.x));
@@ -71,7 +79,7 @@ function getBoundingBox(pts: Vertex3d[]):{area: number, pts: Vertex3d[]} {
     const dy = Math.abs(yMax - yMin);
 
     return {
-        area: dx*dy, 
+        area: dx * dy, 
         pts: [
             {x: xMin, y: yMin, z: 0},
             {x: xMax, y: yMin, z: 0},
@@ -79,4 +87,40 @@ function getBoundingBox(pts: Vertex3d[]):{area: number, pts: Vertex3d[]} {
             {x: xMin, y: yMax, z: 0},
         ]
     };
+}
+
+function sortVerticesCounterClockwise(vertices: Vertex3d[]): Vertex3d[] {
+    // Get centroid
+    const center: Vertex3d = {
+        x: vertices.reduce((sum, v) => sum + v.x, 0) / vertices.length,
+        y: vertices.reduce((sum, v) => sum + v.y, 0) / vertices.length,
+        z: vertices.reduce((sum, v) => sum + v.z, 0) / vertices.length
+    };
+
+    // Calculate polar angle based on center.
+    const verticesWithAngle = vertices.map(v => ({
+        vertex: v,
+        angle: Math.atan2(v.y - center.y, v.x - center.x)
+    }));
+
+    // Sort as polar angle
+    verticesWithAngle.sort((a, b) => a.angle - b.angle);
+
+    let minIndex = 0;
+    for (let i = 1; i < verticesWithAngle.length; i++) {
+        const current = verticesWithAngle[i].vertex;
+        const min = verticesWithAngle[minIndex].vertex;
+        
+        if (current.y < min.y || (current.y === min.y && current.x < min.x)) {
+            minIndex = i;
+        }
+    }
+
+    const result: Vertex3d[] = [];
+    for (let i = 0; i < verticesWithAngle.length; i++) {
+        const index = (minIndex + i) % verticesWithAngle.length;
+        result.push(verticesWithAngle[index].vertex);
+    }
+
+    return result;
 }
