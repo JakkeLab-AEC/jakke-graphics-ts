@@ -5,7 +5,7 @@ import { VectorUtils } from "./vectorUtils";
 const POLYLINE_CLOSED_TOLERANCE = 1e-6;
 const POLYLINE_ZERO_LENGTH = 1e-6;
 
-type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number, lineSegment: Line}
+export type EvaluationFactorInternal = {travelDistanceOnPolyline: number, distToFooting: number, pt: Vertex3d, t: number, lineSegment: Line}
 
 function footingPointOnPolyline2d(polyline: Polyline2d, pt: Vertex2d, withinCurve = false): {pt: Vertex2d, t: number, lineSegment: Line, availableFactors: EvaluationFactorInternal[]}|undefined {
     // Filter when polyline is actually a point or line.
