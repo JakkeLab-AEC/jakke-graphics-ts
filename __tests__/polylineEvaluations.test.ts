@@ -75,4 +75,21 @@ describe('Test Polyline Utils', () => {
 
         expect(true).toBe(true);
     });
+
+    test('Point in Area 2d', () => {
+        const pl: Polyline2d = [
+            {x: 0, y: 0},
+            {x: 100, y: 500},
+            {x: 200, y: 300},
+            {x: 300, y: 400},
+            {x: 500, y: 200},
+            {x: 600, y: 0},
+            {x: 0, y: 0},
+        ]
+
+        const pt: Vertex2d = {x: 150, y: 350};
+        const test = PolylineUtils.isPointInArea2d(pl, pt);
+
+        console.dir(test, {depth: null});
+    });
 });

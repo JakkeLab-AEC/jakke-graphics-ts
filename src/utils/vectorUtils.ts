@@ -108,6 +108,10 @@ function to3d(v: Vertex2d): Vertex3d {
     return {...v, z: 0};
 }
 
+function to2d(v: Vertex3d): Vertex2d {
+    return {x: v.x, y: v.y};
+}
+
 function chain(initial: Vertex3d): VectorChain {
     let current = { ...initial };
 
@@ -159,6 +163,39 @@ function chain(initial: Vertex3d): VectorChain {
     return api;
 }
 
+function getBoundingBox2d(pts: (Vertex2d|Vertex3d)[]): {min: Vertex2d, max: Vertex2d} {
+    const arrCoordX = pts.map(p => p.x);
+    const arrCoordY = pts.map(p => p.y);
+
+    const minX = Math.min(...arrCoordX);
+    const minY = Math.min(...arrCoordY);
+    const maxX = Math.max(...arrCoordX);
+    const maxY = Math.max(...arrCoordY);
+    
+    return {
+        min: {x: minX, y: minY},
+        max: {x: maxX, y: maxY},
+    }
+}
+
+function getBoundingBox3d(pts: Vertex3d[]) {
+    const arrCoordX = pts.map(p => p.x);
+    const arrCoordY = pts.map(p => p.y);
+    const arrCoordZ = pts.map(p => p.z);
+
+    const minX = Math.min(...arrCoordX);
+    const minY = Math.min(...arrCoordY);
+    const minZ = Math.min(...arrCoordZ);
+    const maxX = Math.max(...arrCoordX);
+    const maxY = Math.max(...arrCoordY);
+    const maxZ = Math.max(...arrCoordZ);
+    
+    return {
+        min: {x: minX, y: minY, z: minZ},
+        max: {x: maxX, y: maxY, z: maxZ},
+    }
+}
+
 
 interface VectorChain {
     add(v: Vertex3d): VectorChain;
@@ -191,5 +228,8 @@ export const VectorUtils = {
     rotateOnXZ,
     is2d,
     to3d,
+    to2d,
     chain,
+    getBoundingBox2d,
+    getBoundingBox3d,
 };
