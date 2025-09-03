@@ -1,23 +1,20 @@
-# jakke-graphics-ts (Under construction)
+# jakke-graphics-ts
 
-My common graphics utils for building my aec apps.
+**jakke-graphics-ts** is a TypeScript library for advanced geometric and vector computations, designed for 2D and 3D graphics applications. It provides efficient algorithms and utilities for collision detection, line and polyline evaluation, bounding box calculations, and more.
 
----
+## Features
 
-# Included
+- BVH (Bounding Volume Hierarchy) tree structures for fast spatial queries
+- Collision detection utilities for lines, triangles, and bounding boxes
+- Comprehensive vector math functions (addition, subtraction, dot/cross product, normalization, rotation, scaling)
+- Polyline and line evaluation tools for geometric analysis
+- Type definitions for common geometric primitives (Line, Polyline, Triangle, BoundingBox, Vertex)
 
-## Traverse and searching geometry 
-### BVHTree
-Triangulated surface based BVHTree. Raycasting algorithm is Möller Trumbore's solution.
+## Documentation
 
-## Bounding box
-### Convex Hull 2d
-Graham scan applied.
+Full API documentation is available in the `docs/` folder. Explore classes, functions, and types for detailed usage and examples.
 
-### OBB 2d
-It's a modification of rotating caliphers. Hull points are created from Convex Hull 2d.
+## Installation
 
-## Geometry evaluation
-### Point
-- Get parameterized value indicating the relative position of point on given line in 3d Space.
-- Get intersection point of line on triangle in 3D space. (Möller Trumbore's solution)
+```bash
+npm install jakke-graphics-ts

@@ -72,7 +72,6 @@ export class BVHTree {
 
         const diagonal = node.boundingBox.getDiagonal();
         if (!diagonal) {
-            // fallback: 균등하게 분할
             const mid = Math.floor(triangles.length / 2);
             const leftTriangles = triangles.slice(0, mid);
             const rightTriangles = triangles.slice(mid);
@@ -255,10 +254,36 @@ export class BVHTree {
 }
 
 export class BVHTriangle {
+    /**
+     * The first vertex of the bounding volume hierarchy (BVH) node.
+     * This vertex is used to define the geometry or bounds associated with the node.
+     */
     readonly v1: BVHVertex;
+
+    /**
+     * The second vertex associated with this BVH node.
+     * Used to define the geometry or bounds within the BVH structure.
+     */
     readonly v2: BVHVertex;
+
+    /**
+     * The third vertex of the BVH structure.
+     * 
+     * @readonly
+     */
     readonly v3: BVHVertex;
     
+    /**
+     * Creates a new BVHTriangle instance from three vertices.
+     * 
+     * Each vertex is wrapped in a BVHVertex. The constructor checks for duplicate vertices
+     * by comparing their hashes. If all three vertices are identical, an error is thrown.
+     * 
+     * @param v1 - The first vertex of the triangle.
+     * @param v2 - The second vertex of the triangle.
+     * @param v3 - The third vertex of the triangle.
+     * @throws {Error} If all three vertices are identical.
+     */
     constructor(v1: Vertex3d, v2: Vertex3d, v3: Vertex3d) {
         const bvhV1 = new BVHVertex(v1);
         const bvhV2 = new BVHVertex(v2);
@@ -278,6 +303,13 @@ export class BVHTriangle {
         this.v3 = bvhV3;
     }
 
+    /**
+     * Calculates and returns the centroid of the triangle defined by vertices `v1`, `v2`, and `v3`.
+     *
+     * The centroid is computed as the average of the x, y, and z coordinates of the three vertices.
+     *
+     * @returns {Vertex3d} The centroid of the triangle as a `Vertex3d` object.
+     */
     getCentroid(): Vertex3d {
         return {
             x: (this.v1.x + this.v2.x + this.v3.x) / 3,
@@ -286,14 +318,34 @@ export class BVHTriangle {
         };
     }
 
+    /**
+     * Generates a unique hash string for the current object by concatenating
+     * the hash values of its three vertices (`v1`, `v2`, and `v3`).
+     *
+     * @returns {string} A string representing the combined hash of the three vertices.
+     */
     getHash(): string {
         return `${this.v1.getHash()}-${this.v2.getHash()}-${this.v3.getHash()}`;
     }
 
+    /**
+     * Creates a deep copy of the current `BVHTriangle` instance.
+     * 
+     * @returns A new `BVHTriangle` object with cloned vertex data.
+     */
     clone(): BVHTriangle {
         return new BVHTriangle(this.v1.toObject(), this.v2.toObject(), this.v3.toObject());
     }
 
+    /**
+     * Determines whether the determinant formed by three vertices and the direction vector
+     * between two points is zero. This can be used to check if the points are coplanar or
+     * if the direction vector is parallel to the plane defined by the three vertices.
+     *
+     * @param pt1 - The first vertex used to compute the direction vector.
+     * @param pt2 - The second vertex used to compute the direction vector.
+     * @returns `true` if the determinant is zero; otherwise, `false`.
+     */
     private isDetZero(pt1: Vertex3d, pt2: Vertex3d): boolean {
         const V1V2 = this.v2.subtract(this.v1);
         const V1V3 = this.v3.subtract(this.v1);
@@ -302,6 +354,16 @@ export class BVHTriangle {
         return det === 0;
     }
 
+    /**
+     * Calculates the intersection point of a line segment (defined by `pt1` and `pt2`)
+     * with the plane of the triangle defined by the instance vertices (`v1`, `v2`, `v3`).
+     * Returns the intersection point as a `BVHVertex` if it lies within the triangle,
+     * otherwise returns `undefined`.
+     *
+     * @param pt1 - The starting vertex of the line segment.
+     * @param pt2 - The ending vertex of the line segment.
+     * @returns The intersection point as a `BVHVertex` if it is inside the triangle, or `undefined` otherwise.
+     */
     getPointOnTrianglePlane(pt1: Vertex3d, pt2: Vertex3d): BVHVertex | undefined {
         if (this.isDetZero(pt1, pt2)) return;
 
@@ -343,14 +405,42 @@ export class BVHBoundingBox {
         this._max = new BVHVertex({ x: -Infinity, y: -Infinity, z: -Infinity });
     }
 
+    /**
+     * Creates and returns a new instance of `BVHBoundingBox`.
+     *
+     * @returns {BVHBoundingBox} A newly created `BVHBoundingBox` object.
+     */
     static create(): BVHBoundingBox {
         return new BVHBoundingBox();
     }
 
+    /**
+     * Gets the minimum bounding vertex of the BVH tree.
+     * @returns The {@link BVHVertex} representing the minimum bounds.
+     */
     get min(): BVHVertex { return this._min; }
+
+    /**
+     * Gets the maximum BVH vertex in the tree.
+     * @returns The maximum {@link BVHVertex} stored in this BVHTree.
+     */
     get max(): BVHVertex { return this._max; }
+
+    /**
+     * Indicates whether the BVH tree is empty.
+     * Returns `true` if the tree has not been initialized.
+     */
     get isEmpty(): boolean { return !this._initialized; }
 
+    /**
+     * Adds a vertex to the BVH tree if it is not already present.
+     * Updates the minimum and maximum bounds of the tree to include the new vertex.
+     * Marks the tree as initialized after adding the vertex.
+     *
+     * @param v - The `BVHVertex` to add to the tree.
+     * @returns An `ActionResult` object indicating whether the vertex was added successfully.
+     *          If the vertex is already present, returns `result: false` with a message.
+     */
     addVertex(v: BVHVertex): ActionResult {
         const hash = v.getHash();
         if (this.vertexHashes.has(hash)) {
@@ -376,6 +466,12 @@ export class BVHBoundingBox {
         return { result: true };
     }
 
+    /**
+     * Calculates and returns the centroid of the bounding volume defined by `_min` and `_max`.
+     * The centroid is computed as the midpoint between the minimum and maximum coordinates.
+     *
+     * @returns {BVHVertex | undefined} The centroid as a `BVHVertex` instance, or `undefined` if the tree is not initialized.
+     */
     getCentroid(): BVHVertex | undefined {
         if (!this._initialized) return;
         return new BVHVertex({
@@ -385,6 +481,14 @@ export class BVHBoundingBox {
         });
     }
 
+    /**
+     * Calculates and returns the diagonal vector of the bounding box defined by `_min` and `_max`.
+     * The diagonal is computed as the difference between the maximum and minimum coordinates
+     * along each axis (x, y, z).
+     *
+     * @returns {BVHVertex | undefined} A new `BVHVertex` representing the diagonal vector,
+     * or `undefined` if the bounding box is not initialized.
+     */
     getDiagonal(): BVHVertex | undefined {
         if (!this._initialized) return;
         return new BVHVertex({
@@ -462,9 +566,34 @@ class BVHVertex {
 }
 
 
+/**
+ * Enumerates and manages a collection of BVHTriangle objects for BVH (Bounding Volume Hierarchy) operations.
+ * 
+ * Provides functionality to split the set of triangles into two groups along a specified axis,
+ * typically used for spatial partitioning in BVH construction.
+ *
+ * @remarks
+ * - The triangles are sorted by their centroid position on the chosen axis before splitting.
+ * - Useful for recursive BVH tree building and spatial queries.
+ *
+ * @example
+ * ```typescript
+ * const enumerator = new BVHTriangleEnumerator(triangles);
+ * const [left, right] = enumerator.split('X');
+ * ```
+ */
 class BVHTriangleEnumerator {
     constructor(private readonly triangles: BVHTriangle[]) {}
 
+    /**
+     * Splits the current set of triangles into two groups along the specified axis.
+     * The triangles are sorted by their centroid position on the given axis, then divided into two halves.
+     *
+     * @param axis - The axis along which to split the triangles (e.g., X, Y, or Z).
+     * @returns A tuple containing two arrays of `BVHTriangle`:
+     *          - The first array contains the triangles in the lower half.
+     *          - The second array contains the triangles in the upper half.
+     */
     split(axis: BVHSplitAxis): [BVHTriangle[], BVHTriangle[]] {
         const sorted = [...this.triangles].sort((a, b) => {
             const ca = a.getCentroid();

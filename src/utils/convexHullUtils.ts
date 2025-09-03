@@ -1,5 +1,19 @@
 import { Vertex3d } from "../models/types/basicGeometries"
 
+/**
+ * Computes the convex hull of a set of 2D vertices using the Graham scan algorithm.
+ *
+ * The function expects an array of `Vertex3d` objects, where only the `x` and `y` properties are used.
+ * The result is an array of vertices representing the convex hull in counter-clockwise order.
+ *
+ * @param vertices - An array of `Vertex3d` objects representing the points in 2D space.
+ * @returns An array of `Vertex3d` objects representing the convex hull.
+ *
+ * @remarks
+ * - The input array must contain at least three vertices.
+ * - The `z` property of `Vertex3d` is ignored in the computation.
+ * - Duplicate points and collinear points may affect the output.
+ */
 export function computeContexHull2d(vertices: Vertex3d[]) {
     // Find anchor
     let min = vertices[0];

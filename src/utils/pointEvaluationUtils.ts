@@ -1,6 +1,8 @@
 import { Vertex3dWrapped } from "../models/basic/vertex3d";
 import { Line, Triangle, Vertex3d } from "../models/types/basicGeometries";
 
+const DIRECTION_TOLERANCE = 1e-6;
+
 /**
  * Evaluate the parameter of given line and point.
  * @param p0 Start point of Line
@@ -11,7 +13,6 @@ import { Line, Triangle, Vertex3d } from "../models/types/basicGeometries";
  * When it is on the line but outside the endpoints, the result will be negative float or larger than 1.
  * When it is determined that the point actually not placed on the line, it will return undefined.
  */
-const DIRECTION_TOLERANCE = 1e-6;
 export function pointEvaluationOnLine(p0: Vertex3d, p1: Vertex3d, ptTest: Vertex3d) {
     const direction: Vertex3d = {x: p1.x - p0.x, y: p1.y - p0.y, z: p1.z - p0.z};
     const directionNorm = getNormalizedVector(direction);

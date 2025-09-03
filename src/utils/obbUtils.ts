@@ -1,6 +1,17 @@
 import { Vertex3d } from "../models/types/basicGeometries";
 import { computeContexHull2d } from "./convexHullUtils";
 
+/**
+ * Computes the minimum area oriented bounding box (OBB) for a set of 2D vertices.
+ * The function projects the vertices onto their convex hull, iterates over each edge,
+ * rotates the hull so the edge aligns with the x-axis, and finds the bounding box
+ * with the smallest area. The resulting OBB is returned as four vertices sorted
+ * counterclockwise starting from the bottom-left corner.
+ *
+ * @param vertices - An array of `Vertex3d` objects representing the 2D points (z is ignored).
+ * @returns An object containing the four vertices (`p0`, `p1`, `p2`, `p3`) of the minimum area OBB,
+ *          sorted counterclockwise starting from the bottom-left vertex.
+ */
 export function computeOBB2d(vertices: Vertex3d[]): { p0: Vertex3d, p1: Vertex3d, p2: Vertex3d, p3: Vertex3d } {
     const hull = computeContexHull2d(vertices);
     const comparables: {area: number, p0: Vertex3d, p1: Vertex3d, rotation: number, pts: Vertex3d[]}[] = [];
