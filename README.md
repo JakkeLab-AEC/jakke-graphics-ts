@@ -13,6 +13,7 @@
 ## Documentation
 
 Full API documentation is available in the `docs/` folder. Explore classes, functions, and types for detailed usage and examples.
+Or visit https://jakkelab-aec.github.io/jakke-graphics-ts
 
 ## Installation
 
