@@ -1,4 +1,11 @@
-import { Line, Line2d, Polyline2d, Polyline3d, Vertex2d, Vertex3d } from "../models/types/basicGeometries";
+import {
+	Line,
+	Line2d,
+	Polyline2d,
+	Polyline3d,
+	Vertex2d,
+	Vertex3d,
+} from "../models/types/basicGeometries";
 import { LineEvaluation } from "./lineEvaluationUtils";
 import { VectorUtils } from "./vectorUtils";
 
@@ -6,510 +13,626 @@ const POLYLINE_CLOSED_TOLERANCE = 1e-6;
 const POLYLINE_ZERO_LENGTH = 1e-6;
 
 const EPS_DIST = 1e-9;
-const EPS_T    = 1e-12;
+const EPS_T = 1e-12;
 
 const PT_ON_BB_TOLERANCE = 1e-6;
 
 export type Polyline2dEvaluationFactor = {
-  travelDistanceOnPolyline: number;
-  distToFooting: number;
-  pt: Vertex3d;
-  t: number;                        // 0..1
-  lineSegment: Line;
-  segIndex: number;                 
-  tSeg: number;                     // Param in segment (0..1)
-  isAtVertex: boolean;              
-  vertexIndex?: number;             
+	travelDistanceOnPolyline: number;
+	distToFooting: number;
+	pt: Vertex3d;
+	t: number; // 0..1
+	lineSegment: Line;
+	segIndex: number;
+	tSeg: number; // Param in segment (0..1)
+	isAtVertex: boolean;
+	vertexIndex?: number;
 };
 
 interface FlagsStrict {
-  isOpen: boolean;           // polyline is not closed
-  outOfBoundingBox: boolean; // point is outside bounding box
-  onBoundary: boolean;       // point lies on edge or vertex
+	isOpen: boolean; // polyline is not closed
+	outOfBoundingBox: boolean; // point is outside bounding box
+	onBoundary: boolean; // point lies on edge or vertex
 }
 
-interface IntersectionInfo { pt: Vertex2d; t: number; }
+interface IntersectionInfo {
+	pt: Vertex2d;
+	t: number;
+}
 
 interface PointInAreaResult extends FlagsStrict {
-  result: boolean;            // inside (true) / outside (false)
-  intersections: IntersectionInfo[]; // ray-casting intersections
+	result: boolean; // inside (true) / outside (false)
+	intersections: IntersectionInfo[]; // ray-casting intersections
 }
 
 export namespace PolylineUtils {
-  /**
-   * Calculates the total length of a 2D polyline by summing the distances between consecutive points.
-   *
-   * @param polyline - An array of 2D points representing the polyline.
-   * @returns The total length of the polyline as a number.
-   */
-  export function getLengthPolyline2d(polyline: Polyline2d): number {
-    let sum = 0;
-    for (let i = 0; i < polyline.length - 1; i++) {
-      const p0 = { ...polyline[i], z: 0 };
-      const p1 = { ...polyline[i + 1], z: 0 };
-      sum += VectorUtils.getDist(p0, p1);
-    }
-    return sum;
-  }
-
-  /**
-   * Calculates the total length of a 3D polyline by summing the distances between consecutive points.
-   *
-   * @param polyline - An array of 3D points representing the polyline.
-   * @returns The total length of the polyline.
-   */
-  export function getLengthPolyline3d(polyline: Polyline3d): number {
-    let sum = 0;
-    for (let i = 0; i < polyline.length - 1; i++) {
-      sum += VectorUtils.getDist(polyline[i], polyline[i + 1]);
-    }
-    return sum;
-  }
-
-  /**
-   * Finds the closest footing point on a 2D polyline to a given point.
-   *
-   * Iterates through each segment of the polyline and computes the perpendicular foot point from the input point.
-   * Returns the best candidate with the shortest distance to the input point, along with its position on the polyline,
-   * the corresponding segment, and all available candidate factors.
-   *
-   * @param polyline - The polyline to evaluate, represented as an array of 2D vertices.
-   * @param pt - The 2D point for which to find the closest footing point on the polyline.
-   * @param withinCurve - If true, restricts the search to points strictly within segments (not at vertices).
-   * @returns An object containing:
-   *   - `pt`: The closest point on the polyline (2D).
-   *   - `t`: The normalized parameter (0 to 1) representing the position along the polyline.
-   *   - `lineSegment`: The segment of the polyline where the footing point lies.
-   *   - `availableFactors`: All candidate factors considered during evaluation.
-   *   Returns `undefined` if no valid footing point is found.
-   */
-  export function footingPointOnPolyline2d(
-    polyline: Polyline2d,
-    pt: Vertex2d,
-    withinCurve = false
-  ): { pt: Vertex2d; t: number; lineSegment: Line; availableFactors: Polyline2dEvaluationFactor[] } | undefined {
-    if (polyline.length < 2) return;
-    const polyLen = getLengthPolyline2d(polyline);
-    if (polyLen < POLYLINE_ZERO_LENGTH) return;
-
-    const origin = to3(pt);
-
-    const factorsRaw: Polyline2dEvaluationFactor[] = [];
-    let lengthSum = 0;
-
-    for (let i = 0; i < polyline.length - 1; i++) {
-      const p0 = to3(polyline[i]);
-      const p1 = to3(polyline[i + 1]);
-      if (i > 0) lengthSum += VectorUtils.getDist(to3(polyline[i - 1]), p0);
-
-      const seg: Line = { p0, p1 };
-
-      // Foot on extended line (param.t is based on extended line);
-      const param = LineEvaluation.getFootPointOnLine(seg, origin);
-      if (!param) continue;
-
-      const tRaw = param.t;
-      const tSeg = clamp01(tRaw);
-      const ptOnSeg = lerp3(p0, p1, tSeg);
-
-      if (withinCurve) {
-        if (!(tSeg > EPS_T && tSeg < 1 - EPS_T)) {
-          continue;
-        }
-      }
-
-      const distOnSeg = VectorUtils.getDist(p0, ptOnSeg);
-      const travel = lengthSum + distOnSeg;
-
-      const isAtVertex = (tSeg <= EPS_T) || (tSeg >= 1 - EPS_T);
-      const vertexIndex = tSeg <= EPS_T ? i : (tSeg >= 1 - EPS_T ? i + 1 : undefined);
-
-      factorsRaw.push({
-        travelDistanceOnPolyline: travel,
-        distToFooting: VectorUtils.getDist(origin, ptOnSeg),
-        pt: ptOnSeg,
-        t: travel / polyLen,
-        lineSegment: seg,
-        segIndex: i,
-        tSeg,
-        isAtVertex,
-        vertexIndex
-      });
-    }
-
-    const factors = dedupeCandidates(factorsRaw);
-
-    if (factors.length === 0) return;
-
-    // dist to fooring → travelDistance from polylin start to foot → param(t) on the polyline
-    factors.sort((a, b) =>
-      (a.distToFooting - b.distToFooting) ||
-      (a.travelDistanceOnPolyline - b.travelDistanceOnPolyline) ||
-      (a.t - b.t)
-    );
-
-    const best = factors[0];
-    return {
-      pt: { x: best.pt.x, y: best.pt.y },
-      t: best.travelDistanceOnPolyline / polyLen,
-      lineSegment: best.lineSegment,
-      availableFactors: factors
-    };
-  }
-
-  /**
-   * Finds the closest footing point on a 3D polyline to a given point.
-   *
-   * Iterates through each segment of the polyline and computes the foot point (the closest point on the segment)
-   * to the provided point. Returns the best candidate based on minimum distance to the footing point.
-   *
-   * @param polyline - The polyline represented as an array of 3D vertices.
-   * @param pt - The 3D point for which to find the closest footing point on the polyline.
-   * @param includeEnds - If `true`, endpoints of the polyline segments are considered as valid footing points; otherwise, only interior points are considered.
-   * @returns An object containing the closest point (`pt`) on the polyline, the normalized position (`t`) along the polyline, and the corresponding line segment (`lineSegment`), or `undefined` if no valid footing point is found.
-   */
-  export function footingPointOnPolyline3d(
-    polyline: Polyline3d,
-    pt: Vertex3d,
-    includeEnds = false
-  ): { pt: Vertex3d; t: number; lineSegment: Line } | undefined {
-    if (polyline.length < 2) return;
-    const polyLen = getLengthPolyline3d(polyline);
-    if (polyLen < POLYLINE_ZERO_LENGTH) return;
-
-    const origin = pt;
-
-    const factorsRaw: Polyline2dEvaluationFactor[] = [];
-    let lengthSum = 0;
-
-    for (let i = 0; i < polyline.length - 1; i++) {
-      const p0 = polyline[i];
-      const p1 = polyline[i + 1];
-      if (i > 0) lengthSum += VectorUtils.getDist(polyline[i - 1], p0);
-
-      const seg: Line = { p0, p1 };
-      const param = LineEvaluation.getFootPointOnLine(seg, origin);
-      if (!param) continue;
-
-      const tRaw = param.t;
-      const tSeg = clamp01(tRaw);
-      const ptOnSeg = lerp3(p0, p1, tSeg);
-
-      // when includeEnds=false, don't consider endpoints.
-      if (!includeEnds) {
-        if (!(tSeg > EPS_T && tSeg < 1 - EPS_T)) continue;
-      }
-
-      const distOnSeg = VectorUtils.getDist(p0, ptOnSeg);
-      const travel = lengthSum + distOnSeg;
-
-      const isAtVertex = (tSeg <= EPS_T) || (tSeg >= 1 - EPS_T);
-      const vertexIndex = tSeg <= EPS_T ? i : (tSeg >= 1 - EPS_T ? i + 1 : undefined);
-
-      factorsRaw.push({
-        travelDistanceOnPolyline: travel,
-        distToFooting: VectorUtils.getDist(origin, ptOnSeg),
-        pt: ptOnSeg,
-        t: travel / polyLen,
-        lineSegment: seg,
-        segIndex: i,
-        tSeg,
-        isAtVertex,
-        vertexIndex
-      });
-    }
-
-    const factors = dedupeCandidates(factorsRaw);
-    if (factors.length === 0) return;
-
-    factors.sort((a, b) =>
-      (a.distToFooting - b.distToFooting) ||
-      (a.travelDistanceOnPolyline - b.travelDistanceOnPolyline) ||
-      (a.t - b.t)
-    );
-
-    const best = factors[0];
-    return {
-      pt: best.pt,
-      t: best.travelDistanceOnPolyline / polyLen,
-      lineSegment: best.lineSegment
-    };
-  }
-
-  /**
-   * Computes the intersection points between a given polyline and a line in 3D space.
-   * Iterates through each segment of the polyline and checks for intersection with the specified line.
-   * Returns an array of intersection points, each with its corresponding parameter `t` on the line,
-   * sorted in ascending order of `t`.
-   *
-   * @param polyline - The polyline represented as an array of 3D vertices.
-   * @param line - The line to test for intersections, defined by two 3D points (`p0` and `p1`).
-   * @returns An array of objects containing the intersection point (`pt`) and its parameter (`t`) on the line.
-   */
-  export function getIntersectionWithLine(polyline: Polyline3d, line: Line) {
-      const pts: {pt: Vertex3d, t: number}[] = [];
-      for(let i = 0; i < polyline.length - 1; i++) {
-          const segment: Line = {p0: polyline[i], p1: polyline[i+1]};
-          const test = LineEvaluation.getIntersection(segment, line);
-          
-          if(test.result && test.pt) {
-              const t = LineEvaluation.getParameterOnLine(line.p0, line.p1, test.pt);
-              pts.push({pt: test.pt, t});
-          }
-      }
-
-      return pts.sort((a, b) => a.t - b.t);
-  }
-
-  /**
-   * Computes the intersection points between a 2D polyline and a 2D line.
-   *
-   * Iterates through each segment of the polyline, checks for intersection with the given line,
-   * and collects intersection points along with their parameter `t` on the line.
-   * The result is sorted by the parameter `t` in ascending order.
-   *
-   * @param polyline - The polyline represented as an array of 2D vertices.
-   * @param line - The 2D line to intersect with the polyline.
-   * @returns An array of objects containing the intersection point (`pt`) and its parameter (`t`) on the line, sorted by `t`.
-   */
-  export function getIntersectionWithLine2d(polyline: Polyline2d, line: Line2d) {
-      const pts: {pt: Vertex3d, t: number}[] = [];
-      const line3d: Line = {p0: {...line.p0, z: 0}, p1: {...line.p1, z: 0}};
-      for(let i = 0; i < polyline.length - 1; i++) {
-          const segment: Line = {p0: {...polyline[i], z: 0}, p1: {...polyline[i+1], z: 0}};
-          const test = LineEvaluation.getIntersection(segment, line3d);
-          
-          if(test.result && test.pt) {
-              const t = LineEvaluation.getParameterOnLine(line3d.p0, line3d.p1, test.pt);
-              pts.push({pt: test.pt, t});
-          }
-      }
-
-      return pts.sort((a, b) => a.t - b.t);
-  }
-
-  /**
-   * Determines whether a given 2D point lies inside, outside, or on the boundary of a closed polyline.
-   *
-   * The function performs several checks:
-   * 1. Verifies if the polyline is closed within a specified tolerance.
-   * 2. Checks if the point lies exactly on any edge or vertex of the polyline.
-   * 3. Quickly rejects points outside the polyline's bounding box (with tolerance).
-   * 4. Uses the ray casting (even/odd rule) algorithm to determine if the point is inside the polyline.
-   * 5. Optionally computes intersection points of a horizontal ray from the point with the polyline.
-   *
-   * Returns a result object containing:
-   * - `result`: `true` if the point is inside or on the boundary, `false` otherwise.
-   * - `intersections`: Array of intersection points (if computed).
-   * - Flags indicating if the polyline is open, the point is out of bounding box, or on the boundary.
-   *
-   * @param polyline - The closed polyline represented as an array of 2D vertices.
-   * @param pt - The 2D point to test.
-   * @returns An object describing the point's relation to the polyline and intersection details.
-   */
-  export function isPointInArea2d(polyline: Polyline2d, pt: Vertex2d): PointInAreaResult {
-    // initialize all flags to false
-    let flags: FlagsStrict = {
-      isOpen: false,
-      outOfBoundingBox: false,
-      onBoundary: false
-    };
-
-    // 0) Check if polyline is closed
-    const plStart = polyline[0];
-    const plEnd = polyline[polyline.length - 1];
-    const dist = VectorUtils.getDist({ ...plStart, z: 0 }, { ...plEnd, z: 0 });
-    if (dist > POLYLINE_CLOSED_TOLERANCE) {
-      return { result: false, intersections: [], ...flags, isOpen: true };
-    }
-
-    // 1) If point lies exactly on edge or vertex -> immediately return true
-    for (let i = 0; i < polyline.length - 1; i++) {
-      const a = polyline[i], b = polyline[i + 1];
-      if (pointOnSegment2d(pt, a, b, PT_ON_BB_TOLERANCE)) {
-        return {
-          result: true,
-          intersections: [{ pt, t: 0 }],
-          ...flags,
-          onBoundary: true
-        };
-      }
-    }
-
-    // 2) Quick reject using bounding box (OR + tolerance)
-    const bb = VectorUtils.getBoundingBox2d(polyline);
-    if (pt.x < bb.min.x - PT_ON_BB_TOLERANCE ||
-        pt.x > bb.max.x + PT_ON_BB_TOLERANCE ||
-        pt.y < bb.min.y - PT_ON_BB_TOLERANCE ||
-        pt.y > bb.max.y + PT_ON_BB_TOLERANCE) {
-      return { result: false, intersections: [], ...flags, outOfBoundingBox: true };
-    }
-
-    // 3) Ray casting (even/odd rule) — use half-open intervals [minY, maxY)
-    //    to avoid double counting at vertices
-    let count = 0;
-    for (let i = 0; i < polyline.length - 1; i++) {
-      const a = polyline[i], b = polyline[i + 1];
-      const ax = a.x, ay = a.y, bx = b.x, by = b.y;
-
-      const ymin = Math.min(ay, by), ymax = Math.max(ay, by);
-      if (pt.y >= ymin && pt.y < ymax) {
-        const t = (pt.y - ay) / (by - ay);
-        const xCross = ax + t * (bx - ax);
-        if (xCross > pt.x) count++;
-      }
-    }
-
-    const inside = (count % 2) === 1;
-
-    // Optional: compute actual intersection points
-    const p1: Vertex2d = { x: bb.max.x, y: pt.y };
-    const intersections = getIntersectionWithLine2d(polyline, { p0: pt, p1 });
-
-    return { result: inside, intersections, ...flags };
-  }
-
-  export function isSelfIntersect2d(polyline: Polyline2d, closed = true): boolean {
-        if (polyline.length < 4) return false; // 최소 4점 이상에서만 교차 가능
-
-        // 선분 집합 생성
-        const segments: [Vertex2d, Vertex2d][] = [];
-        for (let i = 0; i < polyline.length - 1; i++) {
-            segments.push([polyline[i], polyline[i + 1]]);
-        }
-        if (closed) {
-            segments.push([polyline[polyline.length - 1], polyline[0]]);
-        }
-
-        // 모든 비인접 선분 쌍 검사
-        for (let i = 0; i < segments.length; i++) {
-            for (let j = i + 1; j < segments.length; j++) {
-                const [a, b] = segments[i];
-                const [c, d] = segments[j];
-
-                // 인접한 선분은 스킵 (끝점 공유)
-                if (a === c || a === d || b === c || b === d) continue;
-
-                if (segmentsIntersect2d(a, b, c, d)) return true;
-            }
-        }
-        return false;
-    }
-
-  function segmentsIntersect2d(a: Vertex2d, b: Vertex2d, c: Vertex2d, d: Vertex2d): boolean {
-    const d1 = VectorUtils.ccw(a, b, c);
-    const d2 = VectorUtils.ccw(a, b, d);
-    const d3 = VectorUtils.ccw(c, d, a);
-    const d4 = VectorUtils.ccw(c, d, b);
-
-    return (d1 * d2 < 0) && (d3 * d4 < 0);
-  }
-
-  export function isSelfIntersect3d(polyline: Polyline3d, closed = true, tolerance = 1e-9): boolean {
-      if (polyline.length < 4) return false;
-
-      const segments: [Vertex3d, Vertex3d][] = [];
-      for (let i = 0; i < polyline.length - 1; i++) {
-          segments.push([polyline[i], polyline[i + 1]]);
-      }
-      if (closed) {
-          segments.push([polyline[polyline.length - 1], polyline[0]]);
-      }
-
-      for (let i = 0; i < segments.length; i++) {
-          for (let j = i + 1; j < segments.length; j++) {
-              const [a, b] = segments[i];
-              const [c, d] = segments[j];
-
-              if (a === c || a === d || b === c || b === d) continue;
-
-              if (segmentsIntersect3d(a, b, c, d, tolerance)) return true;
-          }
-      }
-      return false;
-  }
-
-  function segmentsIntersect3d(a: Vertex3d, b: Vertex3d, c: Vertex3d, d: Vertex3d, tol: number): boolean {
-      const u = VectorUtils.subtract(b, a);
-      const v = VectorUtils.subtract(d, c);
-      const w0 = VectorUtils.subtract(a, c);
-
-      const aDot = VectorUtils.dot(u, u);
-      const bDot = VectorUtils.dot(u, v);
-      const cDot = VectorUtils.dot(v, v);
-      const dDot = VectorUtils.dot(u, w0);
-      const eDot = VectorUtils.dot(v, w0);
-
-      const denom = aDot * cDot - bDot * bDot;
-      let sc = 0, tc = 0;
-
-      if (Math.abs(denom) > tol) {
-          sc = (bDot * eDot - cDot * dDot) / denom;
-          tc = (aDot * eDot - bDot * dDot) / denom;
-      }
-
-      const pA = {
-          x: a.x + sc * u.x,
-          y: a.y + sc * u.y,
-          z: a.z + sc * u.z
-      };
-      const pB = {
-          x: c.x + tc * v.x,
-          y: c.y + tc * v.y,
-          z: c.z + tc * v.z
-      };
-
-      const distSq = (pA.x - pB.x) ** 2 + (pA.y - pB.y) ** 2 + (pA.z - pB.z) ** 2;
-      return distSq < tol * tol;
-  }
-
-  //#region Common utils for internal calculation
-  function clamp01(t: number) {
-    return t < 0 ? 0 : (t > 1 ? 1 : t);
-  }
-
-  function almostEqual(a: number, b: number, eps = EPS_DIST) {
-    return Math.abs(a - b) <= eps;
-  }
-
-  function almostSamePoint(a: Vertex3d, b: Vertex3d, eps = EPS_DIST) {
-    return VectorUtils.getDist(a, b) <= eps;
-  }
-
-  function lerp3(p0: Vertex3d, p1: Vertex3d, t: number): Vertex3d {
-    return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t, z: p0.z + (p1.z - p0.z) * t };
-  }
-
-  function to3(v: Vertex2d): Vertex3d { return { x: v.x, y: v.y, z: 0 }; }
-
-  function dedupeCandidates(cands: Polyline2dEvaluationFactor[]): Polyline2dEvaluationFactor[] {
-    const out: Polyline2dEvaluationFactor[] = [];
-    for (const c of cands) {
-      const dup = out.find(o => almostSamePoint(o.pt, c.pt));
-      if (!dup) out.push(c);
-      else {
-        if (
-          c.distToFooting + EPS_DIST < dup.distToFooting ||
-          (almostEqual(c.distToFooting, dup.distToFooting) && c.travelDistanceOnPolyline + EPS_DIST < dup.travelDistanceOnPolyline)
-        ) {
-          const idx = out.indexOf(dup);
-          out[idx] = c;
-        }
-      }
-    }
-    return out;
-  }
-
-  function pointOnSegment2d(p: Vertex2d, a: Vertex2d, b: Vertex2d, tol = 1e-6): boolean {
-    const abx = b.x - a.x, aby = b.y - a.y;
-    const apx = p.x - a.x, apy = p.y - a.y;
-    const area2 = abx * apy - aby * apx;             // cross product (z-component)
-    if (Math.abs(area2) > tol) return false;         // not collinear
-    const dot = apx * abx + apy * aby;
-    if (dot < -tol) return false;                    // outside range before a
-    const ab2 = abx * abx + aby * aby;
-    if (dot > ab2 + tol) return false;               // outside range after b
-    return true;
-  }
-  //#endregion
+	/**
+	 * Calculates the total length of a 2D polyline by summing the distances between consecutive points.
+	 *
+	 * @param polyline - An array of 2D points representing the polyline.
+	 * @returns The total length of the polyline as a number.
+	 */
+	export function getLengthPolyline2d(polyline: Polyline2d): number {
+		let sum = 0;
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const p0 = { ...polyline[i], z: 0 };
+			const p1 = { ...polyline[i + 1], z: 0 };
+			sum += VectorUtils.getDist(p0, p1);
+		}
+		return sum;
+	}
+
+	/**
+	 * Calculates the total length of a 3D polyline by summing the distances between consecutive points.
+	 *
+	 * @param polyline - An array of 3D points representing the polyline.
+	 * @returns The total length of the polyline.
+	 */
+	export function getLengthPolyline3d(polyline: Polyline3d): number {
+		let sum = 0;
+		for (let i = 0; i < polyline.length - 1; i++) {
+			sum += VectorUtils.getDist(
+				polyline[i],
+				polyline[i + 1]
+			);
+		}
+		return sum;
+	}
+
+	/**
+	 * Finds the closest footing point on a 2D polyline to a given point.
+	 *
+	 * Iterates through each segment of the polyline and computes the perpendicular foot point from the input point.
+	 * Returns the best candidate with the shortest distance to the input point, along with its position on the polyline,
+	 * the corresponding segment, and all available candidate factors.
+	 *
+	 * @param polyline - The polyline to evaluate, represented as an array of 2D vertices.
+	 * @param pt - The 2D point for which to find the closest footing point on the polyline.
+	 * @param withinCurve - If true, restricts the search to points strictly within segments (not at vertices).
+	 * @returns An object containing:
+	 *   - `pt`: The closest point on the polyline (2D).
+	 *   - `t`: The normalized parameter (0 to 1) representing the position along the polyline.
+	 *   - `lineSegment`: The segment of the polyline where the footing point lies.
+	 *   - `availableFactors`: All candidate factors considered during evaluation.
+	 *   Returns `undefined` if no valid footing point is found.
+	 */
+	export function footingPointOnPolyline2d(
+		polyline: Polyline2d,
+		pt: Vertex2d,
+		withinCurve = false
+	):
+		| {
+				pt: Vertex2d;
+				t: number;
+				lineSegment: Line;
+				availableFactors: Polyline2dEvaluationFactor[];
+		  }
+		| undefined {
+		if (polyline.length < 2) return;
+		const polyLen = getLengthPolyline2d(polyline);
+		if (polyLen < POLYLINE_ZERO_LENGTH) return;
+
+		const origin = to3(pt);
+
+		const factorsRaw: Polyline2dEvaluationFactor[] = [];
+		let lengthSum = 0;
+
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const p0 = to3(polyline[i]);
+			const p1 = to3(polyline[i + 1]);
+			if (i > 0)
+				lengthSum += VectorUtils.getDist(
+					to3(polyline[i - 1]),
+					p0
+				);
+
+			const seg: Line = { p0, p1 };
+
+			// Foot on extended line (param.t is based on extended line);
+			const param = LineEvaluation.getFootPointOnLine(
+				seg,
+				origin
+			);
+			if (!param) continue;
+
+			const tRaw = param.t;
+			const tSeg = clamp01(tRaw);
+			const ptOnSeg = lerp3(p0, p1, tSeg);
+
+			if (withinCurve) {
+				if (!(tSeg > EPS_T && tSeg < 1 - EPS_T)) {
+					continue;
+				}
+			}
+
+			const distOnSeg = VectorUtils.getDist(p0, ptOnSeg);
+			const travel = lengthSum + distOnSeg;
+
+			const isAtVertex = tSeg <= EPS_T || tSeg >= 1 - EPS_T;
+			const vertexIndex =
+				tSeg <= EPS_T
+					? i
+					: tSeg >= 1 - EPS_T
+					? i + 1
+					: undefined;
+
+			factorsRaw.push({
+				travelDistanceOnPolyline: travel,
+				distToFooting: VectorUtils.getDist(
+					origin,
+					ptOnSeg
+				),
+				pt: ptOnSeg,
+				t: travel / polyLen,
+				lineSegment: seg,
+				segIndex: i,
+				tSeg,
+				isAtVertex,
+				vertexIndex,
+			});
+		}
+
+		const factors = dedupeCandidates(factorsRaw);
+
+		if (factors.length === 0) return;
+
+		// dist to fooring → travelDistance from polylin start to foot → param(t) on the polyline
+		factors.sort(
+			(a, b) =>
+				a.distToFooting - b.distToFooting ||
+				a.travelDistanceOnPolyline -
+					b.travelDistanceOnPolyline ||
+				a.t - b.t
+		);
+
+		const best = factors[0];
+		return {
+			pt: { x: best.pt.x, y: best.pt.y },
+			t: best.travelDistanceOnPolyline / polyLen,
+			lineSegment: best.lineSegment,
+			availableFactors: factors,
+		};
+	}
+
+	/**
+	 * Finds the closest footing point on a 3D polyline to a given point.
+	 *
+	 * Iterates through each segment of the polyline and computes the foot point (the closest point on the segment)
+	 * to the provided point. Returns the best candidate based on minimum distance to the footing point.
+	 *
+	 * @param polyline - The polyline represented as an array of 3D vertices.
+	 * @param pt - The 3D point for which to find the closest footing point on the polyline.
+	 * @param includeEnds - If `true`, endpoints of the polyline segments are considered as valid footing points; otherwise, only interior points are considered.
+	 * @returns An object containing the closest point (`pt`) on the polyline, the normalized position (`t`) along the polyline, and the corresponding line segment (`lineSegment`), or `undefined` if no valid footing point is found.
+	 */
+	export function footingPointOnPolyline3d(
+		polyline: Polyline3d,
+		pt: Vertex3d,
+		includeEnds = false
+	): { pt: Vertex3d; t: number; lineSegment: Line } | undefined {
+		if (polyline.length < 2) return;
+		const polyLen = getLengthPolyline3d(polyline);
+		if (polyLen < POLYLINE_ZERO_LENGTH) return;
+
+		const origin = pt;
+
+		const factorsRaw: Polyline2dEvaluationFactor[] = [];
+		let lengthSum = 0;
+
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const p0 = polyline[i];
+			const p1 = polyline[i + 1];
+			if (i > 0)
+				lengthSum += VectorUtils.getDist(
+					polyline[i - 1],
+					p0
+				);
+
+			const seg: Line = { p0, p1 };
+			const param = LineEvaluation.getFootPointOnLine(
+				seg,
+				origin
+			);
+			if (!param) continue;
+
+			const tRaw = param.t;
+			const tSeg = clamp01(tRaw);
+			const ptOnSeg = lerp3(p0, p1, tSeg);
+
+			// when includeEnds=false, don't consider endpoints.
+			if (!includeEnds) {
+				if (!(tSeg > EPS_T && tSeg < 1 - EPS_T))
+					continue;
+			}
+
+			const distOnSeg = VectorUtils.getDist(p0, ptOnSeg);
+			const travel = lengthSum + distOnSeg;
+
+			const isAtVertex = tSeg <= EPS_T || tSeg >= 1 - EPS_T;
+			const vertexIndex =
+				tSeg <= EPS_T
+					? i
+					: tSeg >= 1 - EPS_T
+					? i + 1
+					: undefined;
+
+			factorsRaw.push({
+				travelDistanceOnPolyline: travel,
+				distToFooting: VectorUtils.getDist(
+					origin,
+					ptOnSeg
+				),
+				pt: ptOnSeg,
+				t: travel / polyLen,
+				lineSegment: seg,
+				segIndex: i,
+				tSeg,
+				isAtVertex,
+				vertexIndex,
+			});
+		}
+
+		const factors = dedupeCandidates(factorsRaw);
+		if (factors.length === 0) return;
+
+		factors.sort(
+			(a, b) =>
+				a.distToFooting - b.distToFooting ||
+				a.travelDistanceOnPolyline -
+					b.travelDistanceOnPolyline ||
+				a.t - b.t
+		);
+
+		const best = factors[0];
+		return {
+			pt: best.pt,
+			t: best.travelDistanceOnPolyline / polyLen,
+			lineSegment: best.lineSegment,
+		};
+	}
+
+	/**
+	 * Computes the intersection points between a given polyline and a line in 3D space.
+	 * Iterates through each segment of the polyline and checks for intersection with the specified line.
+	 * Returns an array of intersection points, each with its corresponding parameter `t` on the line,
+	 * sorted in ascending order of `t`.
+	 *
+	 * @param polyline - The polyline represented as an array of 3D vertices.
+	 * @param line - The line to test for intersections, defined by two 3D points (`p0` and `p1`).
+	 * @returns An array of objects containing the intersection point (`pt`) and its parameter (`t`) on the line.
+	 */
+	export function getIntersectionWithLine(
+		polyline: Polyline3d,
+		line: Line
+	) {
+		const pts: { pt: Vertex3d; t: number }[] = [];
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const segment: Line = {
+				p0: polyline[i],
+				p1: polyline[i + 1],
+			};
+			const test = LineEvaluation.getIntersection(
+				segment,
+				line
+			);
+
+			if (test.result && test.pt) {
+				const t = LineEvaluation.getParameterOnLine(
+					line.p0,
+					line.p1,
+					test.pt
+				);
+				pts.push({ pt: test.pt, t });
+			}
+		}
+
+		return pts.sort((a, b) => a.t - b.t);
+	}
+
+	/**
+	 * Computes the intersection points between a 2D polyline and a 2D line.
+	 *
+	 * Iterates through each segment of the polyline, checks for intersection with the given line,
+	 * and collects intersection points along with their parameter `t` on the line.
+	 * The result is sorted by the parameter `t` in ascending order.
+	 *
+	 * @param polyline - The polyline represented as an array of 2D vertices.
+	 * @param line - The 2D line to intersect with the polyline.
+	 * @returns An array of objects containing the intersection point (`pt`) and its parameter (`t`) on the line, sorted by `t`.
+	 */
+	export function getIntersectionWithLine2d(
+		polyline: Polyline2d,
+		line: Line2d
+	) {
+		const pts: { pt: Vertex3d; t: number }[] = [];
+		const line3d: Line = {
+			p0: { ...line.p0, z: 0 },
+			p1: { ...line.p1, z: 0 },
+		};
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const segment: Line = {
+				p0: { ...polyline[i], z: 0 },
+				p1: { ...polyline[i + 1], z: 0 },
+			};
+			const test = LineEvaluation.getIntersection(
+				segment,
+				line3d
+			);
+
+			if (test.result && test.pt) {
+				const t = LineEvaluation.getParameterOnLine(
+					line3d.p0,
+					line3d.p1,
+					test.pt
+				);
+				pts.push({ pt: test.pt, t });
+			}
+		}
+
+		return pts.sort((a, b) => a.t - b.t);
+	}
+
+	/**
+	 * Determines whether a given 2D point lies inside, outside, or on the boundary of a closed polyline.
+	 *
+	 * The function performs several checks:
+	 * 1. Verifies if the polyline is closed within a specified tolerance.
+	 * 2. Checks if the point lies exactly on any edge or vertex of the polyline.
+	 * 3. Quickly rejects points outside the polyline's bounding box (with tolerance).
+	 * 4. Uses the ray casting (even/odd rule) algorithm to determine if the point is inside the polyline.
+	 * 5. Optionally computes intersection points of a horizontal ray from the point with the polyline.
+	 *
+	 * Returns a result object containing:
+	 * - `result`: `true` if the point is inside or on the boundary, `false` otherwise.
+	 * - `intersections`: Array of intersection points (if computed).
+	 * - Flags indicating if the polyline is open, the point is out of bounding box, or on the boundary.
+	 *
+	 * @param polyline - The closed polyline represented as an array of 2D vertices.
+	 * @param pt - The 2D point to test.
+	 * @returns An object describing the point's relation to the polyline and intersection details.
+	 */
+	export function isPointInArea2d(
+		polyline: Polyline2d,
+		pt: Vertex2d
+	): PointInAreaResult {
+		// initialize all flags to false
+		let flags: FlagsStrict = {
+			isOpen: false,
+			outOfBoundingBox: false,
+			onBoundary: false,
+		};
+
+		// Check if polyline is closed
+		const plStart = polyline[0];
+		const plEnd = polyline[polyline.length - 1];
+		const dist = VectorUtils.getDist(
+			{ ...plStart, z: 0 },
+			{ ...plEnd, z: 0 }
+		);
+		if (dist > POLYLINE_CLOSED_TOLERANCE) {
+			return {
+				result: false,
+				intersections: [],
+				...flags,
+				isOpen: true,
+			};
+		}
+
+		// If point lies exactly on edge or vertex -> immediately return true
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const a = polyline[i],
+				b = polyline[i + 1];
+			if (pointOnSegment2d(pt, a, b, PT_ON_BB_TOLERANCE)) {
+				return {
+					result: true,
+					intersections: [{ pt, t: 0 }],
+					...flags,
+					onBoundary: true,
+				};
+			}
+		}
+
+		// Quick reject using bounding box (OR + tolerance)
+		const bb = VectorUtils.getBoundingBox2d(polyline);
+		if (
+			pt.x < bb.min.x - PT_ON_BB_TOLERANCE ||
+			pt.x > bb.max.x + PT_ON_BB_TOLERANCE ||
+			pt.y < bb.min.y - PT_ON_BB_TOLERANCE ||
+			pt.y > bb.max.y + PT_ON_BB_TOLERANCE
+		) {
+			return {
+				result: false,
+				intersections: [],
+				...flags,
+				outOfBoundingBox: true,
+			};
+		}
+
+		// 3) Ray casting (even/odd rule) — use half-open intervals [minY, maxY)
+		//    to avoid double counting at vertices
+		let count = 0;
+		for (let i = 0; i < polyline.length - 1; i++) {
+			const a = polyline[i],
+				b = polyline[i + 1];
+			const ax = a.x,
+				ay = a.y,
+				bx = b.x,
+				by = b.y;
+
+			const ymin = Math.min(ay, by),
+				ymax = Math.max(ay, by);
+			if (pt.y >= ymin && pt.y < ymax) {
+				const t = (pt.y - ay) / (by - ay);
+				const xCross = ax + t * (bx - ax);
+				if (xCross > pt.x) count++;
+			}
+		}
+
+		const inside = count % 2 === 1;
+
+		// Optional: compute actual intersection points
+		const p1: Vertex2d = { x: bb.max.x, y: pt.y };
+		const intersections = getIntersectionWithLine2d(polyline, {
+			p0: pt,
+			p1,
+		});
+
+		return { result: inside, intersections, ...flags };
+	}
+
+	const SELF_INTERSECTION_TOLERANCE = 1e-4;
+	/**
+	 * Under construction.
+	 * @param polyline
+	 */
+	// function isSelfIntersect2d(polyline: Polyline2d): boolean {
+	// 	const lines: Line2d[] = [];
+	// 	for (let i = 0; i < polyline.length - 1; i++) {
+	// 		lines.push({ p0: polyline[i], p1: polyline[i + 1] });
+	// 	}
+
+	// 	lines.sort((a, b) => a.p0.x - b.p1.x || a.p0.y - b.p0.y);
+
+	// 	const rad = selectDirection(lines);
+	// 	let vector: Vertex3d = { x: 0, y: 1 };
+	// 	if (rad === Math.PI * 0.5) {
+	// 		vector.x = 0;
+	// 		vector.y = 1;
+	// 	} else if (rad === -Math.PI * 0.5) {
+	// 		vector.y = -1;
+	// 	} else {
+	// 		const tan = Math.tan(rad);
+	// 		const vec = VectorUtils.normalize({
+	// 			x: 1,
+	// 			y: tan,
+	// 			z: 0,
+	// 		});
+	// 		vector.x = vec.x;
+	// 		vector.y = vec.y;
+	// 	}
+
+	// 	const sortLineEndPoints = (a: Vertex2d, b: Vertex2d) => {
+	// 		if (a.x - b.x > SELF_INTERSECTION_TOLERANCE) return 1;
+	// 		else if (a.x - b.x < -SELF_INTERSECTION_TOLERANCE)
+	// 			return -1;
+
+	// 		if (a.y - b.y > SELF_INTERSECTION_TOLERANCE) return 1;
+	// 		else return -1;
+	// 	};
+
+	// 	for (let i = 0; i < lines.length - 1; i++) {
+	// 		const lineA = lines[i];
+	// 		const lineB = lines[i + 1];
+
+	// 		const lineAPts = [lineA.p0, lineA.p1].sort(
+	// 			sortLineEndPoints
+	// 		);
+
+	// 		const lineBPts = [lineB.p0, lineB.p1].sort(
+	// 			sortLineEndPoints
+	// 		);
+	// 	}
+	// }
+
+	// export function isSelfIntersect3d(
+	// 	polyline: Polyline3d,
+	// 	tolerance = 1e-9
+	// ): boolean {}
+
+	// function selectDirection(lines: Line2d[]) {
+	// 	const tolerance = 1e-4;
+
+	// 	const rads: Set<number> = new Set();
+	// 	lines.map(li => {
+	// 		const direction = VectorUtils.chain({ ...li.p1, z: 0 })
+	// 			.subtract({ ...li.p0, z: 0 })
+	// 			.normalize()
+	// 			.value();
+	// 		const rad = Math.atan2(direction.y, direction.x);
+	// 		rads.add(rad);
+	// 	});
+
+	// 	let newRad = Math.random() * Math.PI;
+	// 	while (
+	// 		!rads.has(newRad) &&
+	// 		!rads.has(newRad - tolerance) &&
+	// 		!rads.has(newRad + tolerance)
+	// 	) {
+	// 		newRad = Math.random() * Math.PI;
+	// 	}
+
+	// 	return newRad;
+	// }
+
+	//#region Common utils for internal calculation
+	function clamp01(t: number) {
+		return t < 0 ? 0 : t > 1 ? 1 : t;
+	}
+
+	function almostEqual(a: number, b: number, eps = EPS_DIST) {
+		return Math.abs(a - b) <= eps;
+	}
+
+	function almostSamePoint(a: Vertex3d, b: Vertex3d, eps = EPS_DIST) {
+		return VectorUtils.getDist(a, b) <= eps;
+	}
+
+	function lerp3(p0: Vertex3d, p1: Vertex3d, t: number): Vertex3d {
+		return {
+			x: p0.x + (p1.x - p0.x) * t,
+			y: p0.y + (p1.y - p0.y) * t,
+			z: p0.z + (p1.z - p0.z) * t,
+		};
+	}
+
+	function to3(v: Vertex2d): Vertex3d {
+		return { x: v.x, y: v.y, z: 0 };
+	}
+
+	function dedupeCandidates(
+		cands: Polyline2dEvaluationFactor[]
+	): Polyline2dEvaluationFactor[] {
+		const out: Polyline2dEvaluationFactor[] = [];
+		for (const c of cands) {
+			const dup = out.find(o => almostSamePoint(o.pt, c.pt));
+			if (!dup) out.push(c);
+			else {
+				if (
+					c.distToFooting + EPS_DIST <
+						dup.distToFooting ||
+					(almostEqual(
+						c.distToFooting,
+						dup.distToFooting
+					) &&
+						c.travelDistanceOnPolyline +
+							EPS_DIST <
+							dup.travelDistanceOnPolyline)
+				) {
+					const idx = out.indexOf(dup);
+					out[idx] = c;
+				}
+			}
+		}
+		return out;
+	}
+
+	function pointOnSegment2d(
+		p: Vertex2d,
+		a: Vertex2d,
+		b: Vertex2d,
+		tol = 1e-6
+	): boolean {
+		const abx = b.x - a.x,
+			aby = b.y - a.y;
+		const apx = p.x - a.x,
+			apy = p.y - a.y;
+		const area2 = abx * apy - aby * apx; // cross product (z-component)
+		if (Math.abs(area2) > tol) return false; // not collinear
+		const dot = apx * abx + apy * aby;
+		if (dot < -tol) return false; // outside range before a
+		const ab2 = abx * abx + aby * aby;
+		if (dot > ab2 + tol) return false; // outside range after b
+		return true;
+	}
+	//#endregion
 }
