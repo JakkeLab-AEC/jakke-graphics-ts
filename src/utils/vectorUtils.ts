@@ -365,4 +365,17 @@ export namespace VectorUtils {
             max: {x: maxX, y: maxY, z: maxZ},
         }
     }
+
+    /**
+     * Computes the cross product of the vectors (p1 -> p2) and (p1 -> p3) to determine the orientation of three points.
+     *
+     * @param p1 - The first vertex.
+     * @param p2 - The second vertex.
+     * @param p3 - The third vertex.
+     * @returns A positive value if the points are arranged in a counter-clockwise order,
+     *          a negative value if clockwise, and zero if they are collinear.
+     */
+    export function ccw(p1: Vertex2d, p2: Vertex2d, p3: Vertex2d) {
+        return (p2.x - p1.x) * (p3.y - p1.y) - (p2.y - p1.y) * (p3.x - p1.x);
+    }
 }

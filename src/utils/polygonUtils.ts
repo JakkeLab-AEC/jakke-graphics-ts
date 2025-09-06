@@ -10,11 +10,21 @@ export namespace PolygonUtils {
 
     type LogMessage = {result: boolean, message?: string};
     
-    export function splitQuadrant(p0: Vertex3d, p1: Vertex3d, p2: Vertex3d, p3: Vertex3d): SplittedTriangles {
+    type Quadrant = {p0: Vertex3d, p1: Vertex3d, p2: Vertex3d, p3: Vertex3d};
+    export function splitQuadrant(quadrant: Quadrant): SplittedTriangles {
+        const {p0, p1, p2, p3} = quadrant;
         const planarTest = checkPtsOnPlanar(p0, p1, p2, p3);
         if(!planarTest.result) return ({log: {result: false, message: "NotPlanar"}});
 
         // Test concave or convex
+        const v1 = VectorUtils.subtract(p1, p0);
+        const v2 = VectorUtils.subtract(p2, p0);
+        const normal = VectorUtils.normalize(VectorUtils.cross(v1, v2));
+
+        const helper = Math.abs(normal.x) < 0.9 ? {x: 1, y: 0, z: 0} : {x: 0, y: 1, z: 0};
+        const axisX = VectorUtils.normalize(VectorUtils.cross(helper, normal));
+        const axisY = VectorUtils.cross(normal, axisX);
+        
         const p0p1 = VectorUtils.subtract(p1, p0);
         const p1p2 = VectorUtils.subtract(p2, p1);
         const p2p3 = VectorUtils.subtract(p3, p2);
@@ -93,7 +103,7 @@ export namespace PolygonUtils {
         return flipIndex >= 0 ? flipIndex : undefined;
     }
 
-    const PLANARITY_TOLERANCE = 1e-1;
+    const PLANARITY_TOLERANCE = 1e-20;
 
     type CheckPtsOnPlanarResult = {
         result: boolean,
@@ -112,27 +122,22 @@ export namespace PolygonUtils {
 
         const p0p1 = VectorUtils.chain(pts[1]).subtract(pts[0]).normalize().value();
         const p0p2 = VectorUtils.chain(pts[2]).subtract(pts[0]).normalize().value();
-        const n1 = VectorUtils.cross(p0p1, p0p2);
+        const n = VectorUtils.cross(p0p1, p0p2);
 
         const otherVectors: Vertex3d[] = [];
         pts.forEach((pt, index) => {
             if(index > 2) {
-                const otherVector = VectorUtils
-                    .chain(pt)
-                    .subtract(pts[0])
-                    .normalize()
-                    .value();
-                
+                const otherVector = VectorUtils.subtract(pt, pts[0]);
                 otherVectors.push(otherVector);
             }
         });
 
-        const result = otherVectors.every(v => {
-            const plarnarity = VectorUtils.dot(n1, v);
-            return Math.abs(plarnarity) < PLANARITY_TOLERANCE;
-        });
+        for (let i = 3; i < pts.length; i++) {
+            const v = VectorUtils.subtract(pts[i], pts[0]);
+            const d = VectorUtils.dot(n, v);
+            if (Math.abs(d) > PLANARITY_TOLERANCE) return { result: false, ptsNotEnough: false, notPlanar: true };
+        }
 
-
-        return {result, ptsNotEnough: false, notPlanar: !result}
+        return {result: true, ptsNotEnough: false, notPlanar: false}
     }
 }

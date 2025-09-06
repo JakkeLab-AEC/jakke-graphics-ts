@@ -10,3 +10,4 @@ export * from './models/types/errorMessages';
 export * from './utils/collisionUtils';
 export * from './utils/lineManipluationUtils';
 export * from './utils/polylineUtils';
+export * from './utils/polygonUtils';

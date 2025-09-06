@@ -369,6 +369,100 @@ export namespace PolylineUtils {
     return { result: inside, intersections, ...flags };
   }
 
+  export function isSelfIntersect2d(polyline: Polyline2d, closed = true): boolean {
+        if (polyline.length < 4) return false; // 최소 4점 이상에서만 교차 가능
+
+        // 선분 집합 생성
+        const segments: [Vertex2d, Vertex2d][] = [];
+        for (let i = 0; i < polyline.length - 1; i++) {
+            segments.push([polyline[i], polyline[i + 1]]);
+        }
+        if (closed) {
+            segments.push([polyline[polyline.length - 1], polyline[0]]);
+        }
+
+        // 모든 비인접 선분 쌍 검사
+        for (let i = 0; i < segments.length; i++) {
+            for (let j = i + 1; j < segments.length; j++) {
+                const [a, b] = segments[i];
+                const [c, d] = segments[j];
+
+                // 인접한 선분은 스킵 (끝점 공유)
+                if (a === c || a === d || b === c || b === d) continue;
+
+                if (segmentsIntersect2d(a, b, c, d)) return true;
+            }
+        }
+        return false;
+    }
+
+  function segmentsIntersect2d(a: Vertex2d, b: Vertex2d, c: Vertex2d, d: Vertex2d): boolean {
+    const d1 = VectorUtils.ccw(a, b, c);
+    const d2 = VectorUtils.ccw(a, b, d);
+    const d3 = VectorUtils.ccw(c, d, a);
+    const d4 = VectorUtils.ccw(c, d, b);
+
+    return (d1 * d2 < 0) && (d3 * d4 < 0);
+  }
+
+  export function isSelfIntersect3d(polyline: Polyline3d, closed = true, tolerance = 1e-9): boolean {
+      if (polyline.length < 4) return false;
+
+      const segments: [Vertex3d, Vertex3d][] = [];
+      for (let i = 0; i < polyline.length - 1; i++) {
+          segments.push([polyline[i], polyline[i + 1]]);
+      }
+      if (closed) {
+          segments.push([polyline[polyline.length - 1], polyline[0]]);
+      }
+
+      for (let i = 0; i < segments.length; i++) {
+          for (let j = i + 1; j < segments.length; j++) {
+              const [a, b] = segments[i];
+              const [c, d] = segments[j];
+
+              if (a === c || a === d || b === c || b === d) continue;
+
+              if (segmentsIntersect3d(a, b, c, d, tolerance)) return true;
+          }
+      }
+      return false;
+  }
+
+  function segmentsIntersect3d(a: Vertex3d, b: Vertex3d, c: Vertex3d, d: Vertex3d, tol: number): boolean {
+      const u = VectorUtils.subtract(b, a);
+      const v = VectorUtils.subtract(d, c);
+      const w0 = VectorUtils.subtract(a, c);
+
+      const aDot = VectorUtils.dot(u, u);
+      const bDot = VectorUtils.dot(u, v);
+      const cDot = VectorUtils.dot(v, v);
+      const dDot = VectorUtils.dot(u, w0);
+      const eDot = VectorUtils.dot(v, w0);
+
+      const denom = aDot * cDot - bDot * bDot;
+      let sc = 0, tc = 0;
+
+      if (Math.abs(denom) > tol) {
+          sc = (bDot * eDot - cDot * dDot) / denom;
+          tc = (aDot * eDot - bDot * dDot) / denom;
+      }
+
+      const pA = {
+          x: a.x + sc * u.x,
+          y: a.y + sc * u.y,
+          z: a.z + sc * u.z
+      };
+      const pB = {
+          x: c.x + tc * v.x,
+          y: c.y + tc * v.y,
+          z: c.z + tc * v.z
+      };
+
+      const distSq = (pA.x - pB.x) ** 2 + (pA.y - pB.y) ** 2 + (pA.z - pB.z) ** 2;
+      return distSq < tol * tol;
+  }
+
   //#region Common utils for internal calculation
   function clamp01(t: number) {
     return t < 0 ? 0 : (t > 1 ? 1 : t);
