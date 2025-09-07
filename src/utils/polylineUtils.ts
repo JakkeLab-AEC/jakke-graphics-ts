@@ -71,10 +71,7 @@ export namespace PolylineUtils {
 	export function getLengthPolyline3d(polyline: Polyline3d): number {
 		let sum = 0;
 		for (let i = 0; i < polyline.length - 1; i++) {
-			sum += VectorUtils.getDist(
-				polyline[i],
-				polyline[i + 1]
-			);
+			sum += VectorUtils.getDist(polyline[i], polyline[i + 1]);
 		}
 		return sum;
 	}
@@ -121,18 +118,12 @@ export namespace PolylineUtils {
 			const p0 = to3(polyline[i]);
 			const p1 = to3(polyline[i + 1]);
 			if (i > 0)
-				lengthSum += VectorUtils.getDist(
-					to3(polyline[i - 1]),
-					p0
-				);
+				lengthSum += VectorUtils.getDist(to3(polyline[i - 1]), p0);
 
 			const seg: Line = { p0, p1 };
 
 			// Foot on extended line (param.t is based on extended line);
-			const param = LineEvaluation.getFootPointOnLine(
-				seg,
-				origin
-			);
+			const param = LineEvaluation.getFootPointOnLine(seg, origin);
 			if (!param) continue;
 
 			const tRaw = param.t;
@@ -150,18 +141,11 @@ export namespace PolylineUtils {
 
 			const isAtVertex = tSeg <= EPS_T || tSeg >= 1 - EPS_T;
 			const vertexIndex =
-				tSeg <= EPS_T
-					? i
-					: tSeg >= 1 - EPS_T
-					? i + 1
-					: undefined;
+				tSeg <= EPS_T ? i : tSeg >= 1 - EPS_T ? i + 1 : undefined;
 
 			factorsRaw.push({
 				travelDistanceOnPolyline: travel,
-				distToFooting: VectorUtils.getDist(
-					origin,
-					ptOnSeg
-				),
+				distToFooting: VectorUtils.getDist(origin, ptOnSeg),
 				pt: ptOnSeg,
 				t: travel / polyLen,
 				lineSegment: seg,
@@ -180,8 +164,7 @@ export namespace PolylineUtils {
 		factors.sort(
 			(a, b) =>
 				a.distToFooting - b.distToFooting ||
-				a.travelDistanceOnPolyline -
-					b.travelDistanceOnPolyline ||
+				a.travelDistanceOnPolyline - b.travelDistanceOnPolyline ||
 				a.t - b.t
 		);
 
@@ -222,17 +205,10 @@ export namespace PolylineUtils {
 		for (let i = 0; i < polyline.length - 1; i++) {
 			const p0 = polyline[i];
 			const p1 = polyline[i + 1];
-			if (i > 0)
-				lengthSum += VectorUtils.getDist(
-					polyline[i - 1],
-					p0
-				);
+			if (i > 0) lengthSum += VectorUtils.getDist(polyline[i - 1], p0);
 
 			const seg: Line = { p0, p1 };
-			const param = LineEvaluation.getFootPointOnLine(
-				seg,
-				origin
-			);
+			const param = LineEvaluation.getFootPointOnLine(seg, origin);
 			if (!param) continue;
 
 			const tRaw = param.t;
@@ -241,8 +217,7 @@ export namespace PolylineUtils {
 
 			// when includeEnds=false, don't consider endpoints.
 			if (!includeEnds) {
-				if (!(tSeg > EPS_T && tSeg < 1 - EPS_T))
-					continue;
+				if (!(tSeg > EPS_T && tSeg < 1 - EPS_T)) continue;
 			}
 
 			const distOnSeg = VectorUtils.getDist(p0, ptOnSeg);
@@ -250,18 +225,11 @@ export namespace PolylineUtils {
 
 			const isAtVertex = tSeg <= EPS_T || tSeg >= 1 - EPS_T;
 			const vertexIndex =
-				tSeg <= EPS_T
-					? i
-					: tSeg >= 1 - EPS_T
-					? i + 1
-					: undefined;
+				tSeg <= EPS_T ? i : tSeg >= 1 - EPS_T ? i + 1 : undefined;
 
 			factorsRaw.push({
 				travelDistanceOnPolyline: travel,
-				distToFooting: VectorUtils.getDist(
-					origin,
-					ptOnSeg
-				),
+				distToFooting: VectorUtils.getDist(origin, ptOnSeg),
 				pt: ptOnSeg,
 				t: travel / polyLen,
 				lineSegment: seg,
@@ -278,8 +246,7 @@ export namespace PolylineUtils {
 		factors.sort(
 			(a, b) =>
 				a.distToFooting - b.distToFooting ||
-				a.travelDistanceOnPolyline -
-					b.travelDistanceOnPolyline ||
+				a.travelDistanceOnPolyline - b.travelDistanceOnPolyline ||
 				a.t - b.t
 		);
 
@@ -301,20 +268,14 @@ export namespace PolylineUtils {
 	 * @param line - The line to test for intersections, defined by two 3D points (`p0` and `p1`).
 	 * @returns An array of objects containing the intersection point (`pt`) and its parameter (`t`) on the line.
 	 */
-	export function getIntersectionWithLine(
-		polyline: Polyline3d,
-		line: Line
-	) {
+	export function getIntersectionWithLine(polyline: Polyline3d, line: Line) {
 		const pts: { pt: Vertex3d; t: number }[] = [];
 		for (let i = 0; i < polyline.length - 1; i++) {
 			const segment: Line = {
 				p0: polyline[i],
 				p1: polyline[i + 1],
 			};
-			const test = LineEvaluation.getIntersection(
-				segment,
-				line
-			);
+			const test = LineEvaluation.getIntersection(segment, line);
 
 			if (test.result && test.pt) {
 				const t = LineEvaluation.getParameterOnLine(
@@ -354,10 +315,7 @@ export namespace PolylineUtils {
 				p0: { ...polyline[i], z: 0 },
 				p1: { ...polyline[i + 1], z: 0 },
 			};
-			const test = LineEvaluation.getIntersection(
-				segment,
-				line3d
-			);
+			const test = LineEvaluation.getIntersection(segment, line3d);
 
 			if (test.result && test.pt) {
 				const t = LineEvaluation.getParameterOnLine(
@@ -594,18 +552,13 @@ export namespace PolylineUtils {
 	): Polyline2dEvaluationFactor[] {
 		const out: Polyline2dEvaluationFactor[] = [];
 		for (const c of cands) {
-			const dup = out.find(o => almostSamePoint(o.pt, c.pt));
+			const dup = out.find((o) => almostSamePoint(o.pt, c.pt));
 			if (!dup) out.push(c);
 			else {
 				if (
-					c.distToFooting + EPS_DIST <
-						dup.distToFooting ||
-					(almostEqual(
-						c.distToFooting,
-						dup.distToFooting
-					) &&
-						c.travelDistanceOnPolyline +
-							EPS_DIST <
+					c.distToFooting + EPS_DIST < dup.distToFooting ||
+					(almostEqual(c.distToFooting, dup.distToFooting) &&
+						c.travelDistanceOnPolyline + EPS_DIST <
 							dup.travelDistanceOnPolyline)
 				) {
 					const idx = out.indexOf(dup);

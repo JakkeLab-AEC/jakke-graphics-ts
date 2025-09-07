@@ -1,574 +1,923 @@
-import { Vertex3d } from "./types/basicGeometries";
+import { PolygonUtils } from "utils/polygonUtils";
+import { Line, Polyline3d, Triangle, Vertex3d } from "./types/basicGeometries";
 import { ActionResult } from "./types/errorMessages";
+
+export type BVHHit = {
+	point: Vertex3d;
+	t: number;
+	triangle: BVHTriangle;
+};
 
 /**
  * BVHTree for fast traverse of triangles.
  */
 export class BVHTree {
-    /**
-     * Triangles included.
-     */
-    readonly triangles: BVHTriangle[] = [];
+	/**
+	 * Triangles included.
+	 */
+	readonly triangles: BVHTriangle[] = [];
 
-    /**
-     * Triangle hashes included in BVHTree.
-     */
-    readonly triangleHashes: Set<string> = new Set();
+	/**
+	 * Triangle hashes included in BVHTree.
+	 */
+	readonly triangleHashes: Set<string> = new Set();
 
-    private leftChild?: BVHTree;
-    private rightChild?: BVHTree;
-    private parent?: BVHTree;
-    private _boundingBox: BVHBoundingBox = BVHBoundingBox.create();
+	private leftChild?: BVHTree;
+	private rightChild?: BVHTree;
+	private parent?: BVHTree;
+	private _boundingBox: BVHBoundingBox = BVHBoundingBox.create();
 
-    /**
-     * Get bounding box of this BVHTree.
-     */
-    get boundingBox(): BVHBoundingBox { return this._boundingBox; }
+	/**
+	 * Get bounding box of this BVHTree.
+	 */
+	get boundingBox(): BVHBoundingBox {
+		return this._boundingBox;
+	}
 
-    /**
-     * Add triangle at this three.
-     * @param triangle 
-     * @returns Result of adding triangle action.
-     */
-    addTriangle(triangle: BVHTriangle): ActionResult {
-        const hash = triangle.getHash();
-        if (this.triangleHashes.has(hash)) {
-            return { result: false, message: "Given triangle is already included." };
-        }
+	/**
+	 * Add triangle at this three.
+	 * @param triangle
+	 * @returns Result of adding triangle action.
+	 */
+	addTriangle(triangle: BVHTriangle): ActionResult {
+		const hash = triangle.getHash();
+		if (this.triangleHashes.has(hash)) {
+			return {
+				result: false,
+				message: "Given triangle is already included.",
+			};
+		}
 
-        this.triangles.push(triangle);
-        this.triangleHashes.add(hash);
+		this.triangles.push(triangle);
+		this.triangleHashes.add(hash);
 
-        this._boundingBox.addVertex(triangle.v1);
-        this._boundingBox.addVertex(triangle.v2);
-        this._boundingBox.addVertex(triangle.v3);
+		this._boundingBox.addVertex(triangle.v1);
+		this._boundingBox.addVertex(triangle.v2);
+		this._boundingBox.addVertex(triangle.v3);
 
-        return { result: true };
-    }
+		return { result: true };
+	}
 
-    /**
-     * Build BVHTree's structure.
-     * @returns 
-     */
-    calculateTree(): BVHTree {
-        const sortedTriangles = this.getSortedTriangles();
-        return this.buildBVHTree(sortedTriangles);
-    }
+	/**
+	 * Build BVHTree's structure.
+	 * @returns
+	 */
+	calculateTree(): BVHTree {
+		const sortedTriangles = this.getSortedTriangles();
+		return this.buildBVHTree(sortedTriangles);
+	}
 
-    /**
-     * Internal method for calculating the tree structure.
-     * @param triangles 
-     * @returns 
-     */
-    private buildBVHTree(triangles: BVHTriangle[]): BVHTree {
-        if (triangles.length <= 1) {
-            const leaf = new BVHTree();
-            triangles.forEach(t => leaf.addTriangle(t));
-            return leaf;
-        }
+	/**
+	 * Internal method for calculating the tree structure.
+	 * @param triangles
+	 * @returns
+	 */
+	private buildBVHTree(triangles: BVHTriangle[]): BVHTree {
+		if (triangles.length <= 1) {
+			const leaf = new BVHTree();
+			triangles.forEach((t) => leaf.addTriangle(t));
+			return leaf;
+		}
 
-        const node = new BVHTree();
-        triangles.forEach(t => node.addTriangle(t));
+		const node = new BVHTree();
+		triangles.forEach((t) => node.addTriangle(t));
 
-        const diagonal = node.boundingBox.getDiagonal();
-        if (!diagonal) {
-            const mid = Math.floor(triangles.length / 2);
-            const leftTriangles = triangles.slice(0, mid);
-            const rightTriangles = triangles.slice(mid);
+		const diagonal = node.boundingBox.getDiagonal();
+		if (!diagonal) {
+			const mid = Math.floor(triangles.length / 2);
+			const leftTriangles = triangles.slice(0, mid);
+			const rightTriangles = triangles.slice(mid);
 
-            node.leftChild = this.buildBVHTree(leftTriangles);
-            node.leftChild.parent = node;
+			node.leftChild = this.buildBVHTree(leftTriangles);
+			node.leftChild.parent = node;
 
-            node.rightChild = this.buildBVHTree(rightTriangles);
-            node.rightChild.parent = node;
+			node.rightChild = this.buildBVHTree(rightTriangles);
+			node.rightChild.parent = node;
 
-            return node;
-        }
+			return node;
+		}
 
-        const axis: BVHSplitAxis =
-            diagonal.x >= diagonal.y && diagonal.x >= diagonal.z
-                ? BVHSplitAxis.X
-                : diagonal.y >= diagonal.z
-                ? BVHSplitAxis.Y
-                : BVHSplitAxis.Z;
+		const axis: BVHSplitAxis =
+			diagonal.x >= diagonal.y && diagonal.x >= diagonal.z
+				? BVHSplitAxis.X
+				: diagonal.y >= diagonal.z
+				? BVHSplitAxis.Y
+				: BVHSplitAxis.Z;
 
-        const enumerator = new BVHTriangleEnumerator(triangles);
-        const [leftTriangles, rightTriangles] = enumerator.split(axis);
+		const enumerator = new BVHTriangleEnumerator(triangles);
+		const [leftTriangles, rightTriangles] = enumerator.split(axis);
 
-        node.leftChild = this.buildBVHTree(leftTriangles);
-        node.leftChild.parent = node;
+		node.leftChild = this.buildBVHTree(leftTriangles);
+		node.leftChild.parent = node;
 
-        node.rightChild = this.buildBVHTree(rightTriangles);
-        node.rightChild.parent = node;
+		node.rightChild = this.buildBVHTree(rightTriangles);
+		node.rightChild.parent = node;
 
-        return node;
-    }
+		return node;
+	}
 
-    /**
-     * Internal method for sorting triangles.
-     * @returns 
-     */
-    private getSortedTriangles(): BVHTriangle[] {
-        const diagonal = this._boundingBox?.getDiagonal();
-        if (!diagonal) {
-            throw new Error("Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting.");
-        }
-    
-        const isXMajor = diagonal.x > diagonal.y;
-    
-        return this.triangles
-            .map(t => t.clone())
-            .sort((a, b) => {
-                const ca = a.getCentroid();
-                const cb = b.getCentroid();
-                return isXMajor
-                    ? ca.x - cb.x || ca.y - cb.y
-                    : ca.y - cb.y || ca.x - cb.x;
-            });
-    }
+	/**
+	 * Internal method for sorting triangles.
+	 * @returns
+	 */
+	private getSortedTriangles(): BVHTriangle[] {
+		const diagonal = this._boundingBox?.getDiagonal();
+		if (!diagonal) {
+			throw new Error(
+				"Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting."
+			);
+		}
 
-    /**
-     * Get all nodes included in this tree.
-     * @returns 
-     */
-    getAllNodes(): BVHTree[] {
-        const nodes: BVHTree[] = [];
-        this.traverseTree(nodes);
-        return nodes;
-    }
+		const isXMajor = diagonal.x > diagonal.y;
 
-    /**
-     * Get all node's bounding box.
-     * @returns 
-     */
-    getAllBoundingBoxes(): BVHBoundingBox[] {
-        return this.getAllNodes().map(n => n._boundingBox);
-    }
+		return this.triangles
+			.map((t) => t.clone())
+			.sort((a, b) => {
+				const ca = a.getCentroid();
+				const cb = b.getCentroid();
+				return isXMajor
+					? ca.x - cb.x || ca.y - cb.y
+					: ca.y - cb.y || ca.x - cb.x;
+			});
+	}
 
-    /**
-     * Internal method for traverse tree for collecting all nodes.
-     * @param nodes 
-     */
-    private traverseTree(nodes: BVHTree[]): void {
-        nodes.push(this);
-        this.leftChild?.traverseTree(nodes);
-        this.rightChild?.traverseTree(nodes);
-    }
+	/**
+	 * Get all nodes included in this tree.
+	 * @returns
+	 */
+	getAllNodes(): BVHTree[] {
+		const nodes: BVHTree[] = [];
+		this.traverseTree(nodes);
+		return nodes;
+	}
 
-    /**
-     * Get root node of this tree.
-     * @returns 
-     */
-    getRoot(): BVHTree {
-        let current: BVHTree = this;
-        while (current.parent) {
-            current = current.parent;
-        }
-        return current;
-    }
+	/**
+	 * Get all node's bounding box.
+	 * @returns
+	 */
+	getAllBoundingBoxes(): BVHBoundingBox[] {
+		return this.getAllNodes().map((n) => n._boundingBox);
+	}
 
-    /**
-     * Get the intersection point between the given line and tree.
-     * This uses Möller Trumbore's soluion for determine the collision.
-     * Currently, it returns only the first collision point.
-     * @param p1 The start point of line.
-     * @param p2 The end point of line.
-     * @param onlyOnLine Parameter for testing the getting collision point. 
-     *                   When this set true, it returns the collision point including outbound of the line.
-     * @returns Intersection point when only the intersection exists.
-     */
-    getRayCollision(p1: Vertex3d, p2: Vertex3d, onlyOnLine: boolean): Vertex3d | undefined {
-        if (!this.isRayCollideAABB(p1, p2)) return;
+	/**
+	 * Internal method for traverse tree for collecting all nodes.
+	 * @param nodes
+	 */
+	private traverseTree(nodes: BVHTree[]): void {
+		nodes.push(this);
+		this.leftChild?.traverseTree(nodes);
+		this.rightChild?.traverseTree(nodes);
+	}
 
-        if (!this.leftChild && !this.rightChild) {
-            for (const triangle of this.triangles) {
-                const ptTest = triangle.getPointOnTrianglePlane(p1, p2);
-                if (!ptTest) continue;
+	/**
+	 * Get root node of this tree.
+	 * @returns
+	 */
+	getRoot(): BVHTree {
+		let current: BVHTree = this;
+		while (current.parent) {
+			current = current.parent;
+		}
+		return current;
+	}
 
-                const onLine = ptTest.subtract(new BVHVertex(p1))
-                    .dot(ptTest.subtract(new BVHVertex(p2))) <= 0;
+	/**
+	 * Get the intersection point between the given line and tree.
+	 * This uses Möller Trumbore's soluion for determine the collision.
+	 * Currently, it returns only the first collision point.
+	 * @param p1 The start point of line.
+	 * @param p2 The end point of line.
+	 * @param onlyOnLine Parameter for testing the getting collision point.
+	 *                   When this set true, it returns the collision point including outbound of the line.
+	 * @returns Intersection point when only the intersection exists.
+	 */
+	getRayCollision(
+		p1: Vertex3d,
+		p2: Vertex3d,
+		onlyOnLine: boolean
+	): Vertex3d | undefined {
+		if (!this.isRayCollideAABB(p1, p2)) return;
 
-                if (!onlyOnLine || onLine) return ptTest;
-            }
-        }
+		if (!this.leftChild && !this.rightChild) {
+			for (const triangle of this.triangles) {
+				const ptTest = triangle.getPointOnTrianglePlane(p1, p2);
+				if (!ptTest) continue;
 
-        return this.leftChild?.getRayCollision(p1, p2, onlyOnLine)
-            || this.rightChild?.getRayCollision(p1, p2, onlyOnLine);
-    }
+				const onLine =
+					ptTest
+						.subtract(new BVHVertex(p1))
+						.dot(ptTest.subtract(new BVHVertex(p2))) <= 0;
 
-    /**
-     * Internal method for determine the collision between line and bounding box.
-     * @param p1 The start point of line.
-     * @param p2 The end point of line.
-     * @returns 
-     */
-    private isRayCollideAABB(p1: Vertex3d, p2: Vertex3d): boolean {
-        const ptMin = this._boundingBox.min;
-        const ptMax = this._boundingBox.max;
+				if (!onlyOnLine || onLine) return ptTest;
+			}
+		}
 
-        const intersections = [
-            this.raycastOnPlane(p1, p2, "z", p2.z - p1.z > 0 ? ptMin.z : ptMax.z, ptMin, ptMax),
-            this.raycastOnPlane(p1, p2, "x", p2.x - p1.x > 0 ? ptMin.x : ptMax.x, ptMin, ptMax),
-            this.raycastOnPlane(p1, p2, "y", p2.y - p1.y > 0 ? ptMin.y : ptMax.y, ptMin, ptMax)
-        ];
+		return (
+			this.leftChild?.getRayCollision(p1, p2, onlyOnLine) ||
+			this.rightChild?.getRayCollision(p1, p2, onlyOnLine)
+		);
+	}
 
-        return intersections.filter(pt => pt !== undefined).length === 1;
-    }
+	/**
+	 * Internal method for determine the collision between line and bounding box.
+	 * @param p1 The start point of line.
+	 * @param p2 The end point of line.
+	 * @returns
+	 */
+	private isRayCollideAABB(p1: Vertex3d, p2: Vertex3d): boolean {
+		const ptMin = this._boundingBox.min;
+		const ptMax = this._boundingBox.max;
 
-    /**
-     * Internal method of testing the collision between line and AABB.
-     * @param p1 The start point of line.
-     * @param p2 The end point of line.
-     * @param axis x, y, z can be set.
-     * @param value 
-     * @param ptMin The minimum point of bounding box.
-     * @param ptMax The maximum point of bounding box.
-     * @returns 
-     */
-    private raycastOnPlane(p1: Vertex3d, p2: Vertex3d, axis: keyof Vertex3d, value: number, ptMin: Vertex3d, ptMax: Vertex3d): Vertex3d | undefined {
-        const delta = p2[axis] - p1[axis];
-        if (delta === 0) return undefined;
+		const intersections = [
+			this.raycastOnPlane(
+				p1,
+				p2,
+				"z",
+				p2.z - p1.z > 0 ? ptMin.z : ptMax.z,
+				ptMin,
+				ptMax
+			),
+			this.raycastOnPlane(
+				p1,
+				p2,
+				"x",
+				p2.x - p1.x > 0 ? ptMin.x : ptMax.x,
+				ptMin,
+				ptMax
+			),
+			this.raycastOnPlane(
+				p1,
+				p2,
+				"y",
+				p2.y - p1.y > 0 ? ptMin.y : ptMax.y,
+				ptMin,
+				ptMax
+			),
+		];
 
-        const t = (value - p1[axis]) / delta;
-        const pt = {
-            x: p1.x + t * (p2.x - p1.x),
-            y: p1.y + t * (p2.y - p1.y),
-            z: p1.z + t * (p2.z - p1.z)
-        };
+		return intersections.filter((pt) => pt !== undefined).length === 1;
+	}
 
-        return this.isPointInside(pt, ptMin, ptMax) ? pt : undefined;
-    }
+	/**
+	 * Internal method of testing the collision between line and AABB.
+	 * @param p1 The start point of line.
+	 * @param p2 The end point of line.
+	 * @param axis x, y, z can be set.
+	 * @param value
+	 * @param ptMin The minimum point of bounding box.
+	 * @param ptMax The maximum point of bounding box.
+	 * @returns
+	 */
+	private raycastOnPlane(
+		p1: Vertex3d,
+		p2: Vertex3d,
+		axis: keyof Vertex3d,
+		value: number,
+		ptMin: Vertex3d,
+		ptMax: Vertex3d
+	): Vertex3d | undefined {
+		const delta = p2[axis] - p1[axis];
+		if (delta === 0) return undefined;
 
-    /**
-     * 
-     * @param pt 
-     * @param min 
-     * @param max 
-     * @returns 
-     */
-    private isPointInside(pt: Vertex3d, min: Vertex3d, max: Vertex3d): boolean {
-        return min.x <= pt.x && pt.x <= max.x
-            && min.y <= pt.y && pt.y <= max.y
-            && min.z <= pt.z && pt.z <= max.z;
-    }
+		const t = (value - p1[axis]) / delta;
+		const pt = {
+			x: p1.x + t * (p2.x - p1.x),
+			y: p1.y + t * (p2.y - p1.y),
+			z: p1.z + t * (p2.z - p1.z),
+		};
+
+		return this.isPointInside(pt, ptMin, ptMax) ? pt : undefined;
+	}
+
+	/**
+	 *
+	 * @param pt
+	 * @param min
+	 * @param max
+	 * @returns
+	 */
+	private isPointInside(pt: Vertex3d, min: Vertex3d, max: Vertex3d): boolean {
+		return (
+			min.x <= pt.x &&
+			pt.x <= max.x &&
+			min.y <= pt.y &&
+			pt.y <= max.y &&
+			min.z <= pt.z &&
+			pt.z <= max.z
+		);
+	}
+
+	getProjectedTreeOnXY(): BVHTree {
+		const tree = new BVHTree();
+
+		for (const t of this.triangles) {
+			const v1: Vertex3d = { ...t.v1, z: 0 };
+			const v2: Vertex3d = { ...t.v2, z: 0 };
+			const v3: Vertex3d = { ...t.v3, z: 0 };
+			const triangleFlat = new BVHTriangle(v1, v2, v3, t); // ← source 연결
+			tree.addTriangle(triangleFlat);
+		}
+		tree.calculateTree();
+		return tree;
+	}
+
+	private segmentVsAABB(
+		p0: Vertex3d,
+		p1: Vertex3d,
+		min: Vertex3d,
+		max: Vertex3d,
+		eps = 1e-12
+	): { tMin: number; tMax: number } | undefined {
+		const dx = p1.x - p0.x,
+			dy = p1.y - p0.y,
+			dz = p1.z - p0.z;
+		let tMin = 0.0,
+			tMax = 1.0;
+
+		// X
+		if (Math.abs(dx) < eps) {
+			if (p0.x < min.x || p0.x > max.x) return undefined;
+		} else {
+			const inv = 1 / dx;
+			let t1 = (min.x - p0.x) * inv;
+			let t2 = (max.x - p0.x) * inv;
+			if (t1 > t2) [t1, t2] = [t2, t1];
+			tMin = Math.max(tMin, t1);
+			tMax = Math.min(tMax, t2);
+			if (tMax < tMin) return undefined;
+		}
+
+		// Y
+		if (Math.abs(dy) < eps) {
+			if (p0.y < min.y || p0.y > max.y) return undefined;
+		} else {
+			const inv = 1 / dy;
+			let t1 = (min.y - p0.y) * inv;
+			let t2 = (max.y - p0.y) * inv;
+			if (t1 > t2) [t1, t2] = [t2, t1];
+			tMin = Math.max(tMin, t1);
+			tMax = Math.min(tMax, t2);
+			if (tMax < tMin) return undefined;
+		}
+
+		// Z
+		if (Math.abs(dz) < eps) {
+			if (p0.z < min.z || p0.z > max.z) return undefined;
+		} else {
+			const inv = 1 / dz;
+			let t1 = (min.z - p0.z) * inv;
+			let t2 = (max.z - p0.z) * inv;
+			if (t1 > t2) [t1, t2] = [t2, t1];
+			tMin = Math.max(tMin, t1);
+			tMax = Math.min(tMax, t2);
+			if (tMax < tMin) return undefined;
+		}
+
+		return { tMin, tMax };
+	}
+
+	private static getParameterOnLine(
+		p0: Vertex3d,
+		p1: Vertex3d,
+		pt: Vertex3d
+	): number {
+		const dx = p1.x - p0.x,
+			dy = p1.y - p0.y,
+			dz = p1.z - p0.z;
+		const lx2 = dx * dx + dy * dy + dz * dz;
+		if (lx2 === 0) return 0; // zero-length
+		const tx = pt.x - p0.x,
+			ty = pt.y - p0.y,
+			tz = pt.z - p0.z;
+		return (tx * dx + ty * dy + tz * dz) / lx2;
+	}
+
+	/**
+	 * Finds all intersection points between the given line (or segment) and all triangles in the BVH,
+	 * and returns them sorted in ascending order of t.
+	 *
+	 * @param p0  Start point of the line/segment
+	 * @param p1  End point of the line/segment
+	 * @param options
+	 *   - includeOutsideSegment: If true, treats as infinite line (keeps t outside 0~1). Default is false (only segment: 0<=t<=1)
+	 *   - epsilon: For deduplication and numerical stability (default 1e-6)
+	 *   - dedupeBy: 't'|'point' (default 't') — deduplication criterion for shared edges/vertices
+	 */
+	getRayCollisions(
+		p0: Vertex3d,
+		p1: Vertex3d,
+		options?: {
+			includeOutsideSegment?: boolean;
+			epsilon?: number;
+			dedupeBy?: "t" | "point";
+		}
+	): BVHHit[] {
+		const includeOutside = options?.includeOutsideSegment ?? false;
+		const eps = options?.epsilon ?? 1e-6;
+		const dedupeBy = options?.dedupeBy ?? "t";
+
+		const hits: BVHHit[] = [];
+
+		const aabbHit = this.segmentVsAABB(
+			p0,
+			p1,
+			this._boundingBox.min,
+			this._boundingBox.max
+		);
+		if (!aabbHit) return hits;
+
+		if (!this.leftChild && !this.rightChild) {
+			for (const tri of this.triangles) {
+				const pt = tri.getPointOnTrianglePlane(p0, p1);
+				if (!pt) continue;
+
+				const ptObj = pt.toObject();
+				const t = BVHTree.getParameterOnLine(p0, p1, ptObj);
+
+				if (!includeOutside && (t < -eps || t > 1 + eps)) continue;
+
+				hits.push({ point: ptObj, t, triangle: tri });
+			}
+		} else {
+			if (this.leftChild)
+				hits.push(...this.leftChild.getRayCollisions(p0, p1, options));
+			if (this.rightChild)
+				hits.push(...this.rightChild.getRayCollisions(p0, p1, options));
+		}
+
+		hits.sort((a, b) => a.t - b.t);
+
+		if (hits.length > 1) {
+			const deduped: BVHHit[] = [];
+			if (dedupeBy === "t") {
+				let lastT: number | undefined;
+				for (const h of hits) {
+					if (lastT === undefined || Math.abs(h.t - lastT) > eps) {
+						deduped.push(h);
+						lastT = h.t;
+					}
+				}
+			} else {
+				const q = (v: number) => Math.round(v / eps);
+				const seen = new Set<string>();
+				for (const h of hits) {
+					const key = `${q(h.point.x)},${q(h.point.y)},${q(
+						h.point.z
+					)}`;
+					if (!seen.has(key)) {
+						seen.add(key);
+						deduped.push(h);
+					}
+				}
+			}
+			return deduped;
+		}
+
+		return hits;
+	}
+
+	projectLine(li: Line): Polyline3d {
+		const eps = 1e-6;
+
+		// BVH를 이용해 pt가 어떤 삼각형 내부(경계 포함)에 있는지 빠르게 검사
+		const isPointInsideAnyTriangle = (
+			node: BVHTree,
+			pt: Vertex3d
+		): boolean => {
+			const min = node._boundingBox.min.toObject();
+			const max = node._boundingBox.max.toObject();
+			if (
+				pt.x < min.x - eps ||
+				pt.x > max.x + eps ||
+				pt.y < min.y - eps ||
+				pt.y > max.y + eps ||
+				pt.z < min.z - eps ||
+				pt.z > max.z + eps
+			)
+				return false;
+
+			const hasChild =
+				(node as any).leftChild || (node as any).rightChild;
+			if (!hasChild) {
+				for (const tri of node.triangles) {
+					if (PolygonUtils.pointInTriangle(pt, tri.toObject()))
+						return true;
+				}
+				return false;
+			}
+
+			return (
+				(!!(node as any).leftChild &&
+					isPointInsideAnyTriangle((node as any).leftChild, pt)) ||
+				(!!(node as any).rightChild &&
+					isPointInsideAnyTriangle((node as any).rightChild, pt))
+			);
+		};
+
+		const hits = this.getRayCollisions(li.p0, li.p1, {
+			includeOutsideSegment: false,
+			epsilon: eps,
+			dedupeBy: "t",
+		});
+
+		const root = this.getRoot();
+		const extraEnds: { t: number; point: Vertex3d }[] = [];
+		if (isPointInsideAnyTriangle(root, li.p0)) {
+			extraEnds.push({ t: 0, point: li.p0 });
+		}
+		if (isPointInsideAnyTriangle(root, li.p1)) {
+			extraEnds.push({ t: 1, point: li.p1 });
+		}
+
+		type HitLike = { t: number; point: Vertex3d };
+		const merged: HitLike[] = [
+			...hits.map((h) => ({ t: h.t, point: h.point })),
+			...extraEnds,
+		];
+
+		if (merged.length === 0) return [];
+
+		merged.sort((a, b) => a.t - b.t);
+		const dedup: HitLike[] = [];
+		let lastT: number | undefined;
+		for (const h of merged) {
+			if (lastT === undefined || Math.abs(h.t - lastT) > eps) {
+				dedup.push(h);
+				lastT = h.t;
+			}
+		}
+
+		const polyline: Polyline3d = dedup.map((h) => h.point);
+		return polyline;
+	}
 }
 
 export class BVHTriangle {
-    /**
-     * The first vertex of the bounding volume hierarchy (BVH) node.
-     * This vertex is used to define the geometry or bounds associated with the node.
-     */
-    readonly v1: BVHVertex;
+	/**
+	 * The first vertex of the bounding volume hierarchy (BVH) node.
+	 * This vertex is used to define the geometry or bounds associated with the node.
+	 */
+	readonly v1: BVHVertex;
 
-    /**
-     * The second vertex associated with this BVH node.
-     * Used to define the geometry or bounds within the BVH structure.
-     */
-    readonly v2: BVHVertex;
+	/**
+	 * The second vertex associated with this BVH node.
+	 * Used to define the geometry or bounds within the BVH structure.
+	 */
+	readonly v2: BVHVertex;
 
-    /**
-     * The third vertex of the BVH structure.
-     * 
-     * @readonly
-     */
-    readonly v3: BVHVertex;
-    
-    /**
-     * Creates a new BVHTriangle instance from three vertices.
-     * 
-     * Each vertex is wrapped in a BVHVertex. The constructor checks for duplicate vertices
-     * by comparing their hashes. If all three vertices are identical, an error is thrown.
-     * 
-     * @param v1 - The first vertex of the triangle.
-     * @param v2 - The second vertex of the triangle.
-     * @param v3 - The third vertex of the triangle.
-     * @throws {Error} If all three vertices are identical.
-     */
-    constructor(v1: Vertex3d, v2: Vertex3d, v3: Vertex3d) {
-        const bvhV1 = new BVHVertex(v1);
-        const bvhV2 = new BVHVertex(v2);
-        const bvhV3 = new BVHVertex(v3);
+	/**
+	 * The third vertex of the BVH structure.
+	 *
+	 * @readonly
+	 */
+	readonly v3: BVHVertex;
 
-        const dupV1V2 = bvhV1.getHash() === bvhV2.getHash();
-        const dupV2V3 = bvhV2.getHash() === bvhV3.getHash();
-        const dupV3V1 = bvhV3.getHash() === bvhV1.getHash();
+	// 정사영된 삼각형이 참조할 원본 3D 삼각형
+	/**
+	 * The original 3D triangle referenced by a projected triangle.
+	 */
+	readonly source?: BVHTriangle;
 
-        const isDuplicated = dupV1V2 && dupV2V3 && dupV3V1;
-        if (isDuplicated) {
-            throw new Error("Cannot create BVHTriangle with all identical vertices");
-        }
+	/**
+	 * Creates a new BVHTriangle instance from three vertices.
+	 *
+	 * Each vertex is wrapped in a BVHVertex. The constructor checks for duplicate vertices
+	 * by comparing their hashes. If all three vertices are identical, an error is thrown.
+	 *
+	 * @param v1 - The first vertex of the triangle.
+	 * @param v2 - The second vertex of the triangle.
+	 * @param v3 - The third vertex of the triangle.
+	 * @throws {Error} If all three vertices are identical.
+	 */
+	constructor(
+		v1: Vertex3d,
+		v2: Vertex3d,
+		v3: Vertex3d,
+		source?: BVHTriangle
+	) {
+		const bvhV1 = new BVHVertex(v1);
+		const bvhV2 = new BVHVertex(v2);
+		const bvhV3 = new BVHVertex(v3);
 
-        this.v1 = bvhV1;
-        this.v2 = bvhV2;
-        this.v3 = bvhV3;
-    }
+		const dupV1V2 = bvhV1.getHash() === bvhV2.getHash();
+		const dupV2V3 = bvhV2.getHash() === bvhV3.getHash();
+		const dupV3V1 = bvhV3.getHash() === bvhV1.getHash();
 
-    /**
-     * Calculates and returns the centroid of the triangle defined by vertices `v1`, `v2`, and `v3`.
-     *
-     * The centroid is computed as the average of the x, y, and z coordinates of the three vertices.
-     *
-     * @returns {Vertex3d} The centroid of the triangle as a `Vertex3d` object.
-     */
-    getCentroid(): Vertex3d {
-        return {
-            x: (this.v1.x + this.v2.x + this.v3.x) / 3,
-            y: (this.v1.y + this.v2.y + this.v3.y) / 3,
-            z: (this.v1.z + this.v2.z + this.v3.z) / 3
-        };
-    }
+		const isDuplicated = dupV1V2 && dupV2V3 && dupV3V1;
+		if (isDuplicated) {
+			throw new Error(
+				"Cannot create BVHTriangle with all identical vertices"
+			);
+		}
 
-    /**
-     * Generates a unique hash string for the current object by concatenating
-     * the hash values of its three vertices (`v1`, `v2`, and `v3`).
-     *
-     * @returns {string} A string representing the combined hash of the three vertices.
-     */
-    getHash(): string {
-        return `${this.v1.getHash()}-${this.v2.getHash()}-${this.v3.getHash()}`;
-    }
+		this.v1 = bvhV1;
+		this.v2 = bvhV2;
+		this.v3 = bvhV3;
+		this.source = source;
+	}
 
-    /**
-     * Creates a deep copy of the current `BVHTriangle` instance.
-     * 
-     * @returns A new `BVHTriangle` object with cloned vertex data.
-     */
-    clone(): BVHTriangle {
-        return new BVHTriangle(this.v1.toObject(), this.v2.toObject(), this.v3.toObject());
-    }
+	/**
+	 * Calculates and returns the centroid of the triangle defined by vertices `v1`, `v2`, and `v3`.
+	 *
+	 * The centroid is computed as the average of the x, y, and z coordinates of the three vertices.
+	 *
+	 * @returns {Vertex3d} The centroid of the triangle as a `Vertex3d` object.
+	 */
+	getCentroid(): Vertex3d {
+		return {
+			x: (this.v1.x + this.v2.x + this.v3.x) / 3,
+			y: (this.v1.y + this.v2.y + this.v3.y) / 3,
+			z: (this.v1.z + this.v2.z + this.v3.z) / 3,
+		};
+	}
 
-    /**
-     * Determines whether the determinant formed by three vertices and the direction vector
-     * between two points is zero. This can be used to check if the points are coplanar or
-     * if the direction vector is parallel to the plane defined by the three vertices.
-     *
-     * @param pt1 - The first vertex used to compute the direction vector.
-     * @param pt2 - The second vertex used to compute the direction vector.
-     * @returns `true` if the determinant is zero; otherwise, `false`.
-     */
-    private isDetZero(pt1: Vertex3d, pt2: Vertex3d): boolean {
-        const V1V2 = this.v2.subtract(this.v1);
-        const V1V3 = this.v3.subtract(this.v1);
-        const d = new BVHVertex(pt2).subtract(new BVHVertex(pt1)).normalized();
-        const det = V1V2.dot(d.cross(V1V3));
-        return det === 0;
-    }
+	/**
+	 * Generates a unique hash string for the current object by concatenating
+	 * the hash values of its three vertices (`v1`, `v2`, and `v3`).
+	 *
+	 * @returns {string} A string representing the combined hash of the three vertices.
+	 */
+	getHash(): string {
+		return `${this.v1.getHash()}-${this.v2.getHash()}-${this.v3.getHash()}`;
+	}
 
-    /**
-     * Calculates the intersection point of a line segment (defined by `pt1` and `pt2`)
-     * with the plane of the triangle defined by the instance vertices (`v1`, `v2`, `v3`).
-     * Returns the intersection point as a `BVHVertex` if it lies within the triangle,
-     * otherwise returns `undefined`.
-     *
-     * @param pt1 - The starting vertex of the line segment.
-     * @param pt2 - The ending vertex of the line segment.
-     * @returns The intersection point as a `BVHVertex` if it is inside the triangle, or `undefined` otherwise.
-     */
-    getPointOnTrianglePlane(pt1: Vertex3d, pt2: Vertex3d): BVHVertex | undefined {
-        if (this.isDetZero(pt1, pt2)) return;
+	/**
+	 * Creates a deep copy of the current `BVHTriangle` instance.
+	 *
+	 * @returns A new `BVHTriangle` object with cloned vertex data.
+	 */
+	clone(): BVHTriangle {
+		return new BVHTriangle(
+			this.v1.toObject(),
+			this.v2.toObject(),
+			this.v3.toObject(),
+			this.source ?? undefined
+		);
+	}
 
-        const V1 = this.v1;
-        const V2 = this.v2;
-        const V3 = this.v3;
+	/**
+	 * Determines whether the determinant formed by three vertices and the direction vector
+	 * between two points is zero. This can be used to check if the points are coplanar or
+	 * if the direction vector is parallel to the plane defined by the three vertices.
+	 *
+	 * @param pt1 - The first vertex used to compute the direction vector.
+	 * @param pt2 - The second vertex used to compute the direction vector.
+	 * @returns `true` if the determinant is zero; otherwise, `false`.
+	 */
+	private isDetZero(pt1: Vertex3d, pt2: Vertex3d): boolean {
+		const V1V2 = this.v2.subtract(this.v1);
+		const V1V3 = this.v3.subtract(this.v1);
+		const d = new BVHVertex(pt2).subtract(new BVHVertex(pt1)).normalized();
+		const det = V1V2.dot(d.cross(V1V3));
+		return det === 0;
+	}
 
-        const P1 = new BVHVertex(pt1);
-        const P2 = new BVHVertex(pt2);
+	/**
+	 * Calculates the intersection point of a line segment (defined by `pt1` and `pt2`)
+	 * with the plane of the triangle defined by the instance vertices (`v1`, `v2`, `v3`).
+	 * Returns the intersection point as a `BVHVertex` if it lies within the triangle,
+	 * otherwise returns `undefined`.
+	 *
+	 * @param pt1 - The starting vertex of the line segment.
+	 * @param pt2 - The ending vertex of the line segment.
+	 * @returns The intersection point as a `BVHVertex` if it is inside the triangle, or `undefined` otherwise.
+	 */
+	getPointOnTrianglePlane(
+		pt1: Vertex3d,
+		pt2: Vertex3d
+	): BVHVertex | undefined {
+		if (this.isDetZero(pt1, pt2)) return;
 
-        const V1V2 = V2.subtract(V1);
-        const V1V3 = V3.subtract(V1);
-        const V1P1 = P1.subtract(V1);
-        const d = P2.subtract(P1).normalized();
+		const V1 = this.v1;
+		const V2 = this.v2;
+		const V3 = this.v3;
 
-        const det = V1V2.dot(d.cross(V1V3));
+		const P1 = new BVHVertex(pt1);
+		const P2 = new BVHVertex(pt2);
 
-        const v = d.dot(V1V3.cross(V1P1)) / det;
-        const w = d.dot(V1P1.cross(V1V2)) / det;
-        const u = 1 - (v + w);
+		const V1V2 = V2.subtract(V1);
+		const V1V3 = V3.subtract(V1);
+		const V1P1 = P1.subtract(V1);
+		const d = P2.subtract(P1).normalized();
 
-        const result = V1.multiply(u).add(V2.multiply(v)).add(V3.multiply(w));
+		const det = V1V2.dot(d.cross(V1V3));
 
-        const validParams = [u, v, w].every(val => val >= 0 && val <= 1);
-        return validParams ? result : undefined;
-    }
+		const v = d.dot(V1V3.cross(V1P1)) / det;
+		const w = d.dot(V1P1.cross(V1V2)) / det;
+		const u = 1 - (v + w);
+
+		const result = V1.multiply(u).add(V2.multiply(v)).add(V3.multiply(w));
+
+		const validParams = [u, v, w].every((val) => val >= 0 && val <= 1);
+		return validParams ? result : undefined;
+	}
+
+	toObject(): Triangle {
+		return {
+			p0: this.v1,
+			p1: this.v2,
+			p2: this.v3,
+		};
+	}
 }
 
 export class BVHBoundingBox {
-    private _min: BVHVertex;
-    private _max: BVHVertex;
-    private vertexHashes: Set<string>;
-    private _initialized: boolean;
+	private _min: BVHVertex;
+	private _max: BVHVertex;
+	private vertexHashes: Set<string>;
+	private _initialized: boolean;
 
-    private constructor() {
-        this.vertexHashes = new Set();
-        this._initialized = false;
-        this._min = new BVHVertex({ x: Infinity, y: Infinity, z: Infinity });
-        this._max = new BVHVertex({ x: -Infinity, y: -Infinity, z: -Infinity });
-    }
+	private constructor() {
+		this.vertexHashes = new Set();
+		this._initialized = false;
+		this._min = new BVHVertex({ x: Infinity, y: Infinity, z: Infinity });
+		this._max = new BVHVertex({ x: -Infinity, y: -Infinity, z: -Infinity });
+	}
 
-    /**
-     * Creates and returns a new instance of `BVHBoundingBox`.
-     *
-     * @returns {BVHBoundingBox} A newly created `BVHBoundingBox` object.
-     */
-    static create(): BVHBoundingBox {
-        return new BVHBoundingBox();
-    }
+	/**
+	 * Creates and returns a new instance of `BVHBoundingBox`.
+	 *
+	 * @returns {BVHBoundingBox} A newly created `BVHBoundingBox` object.
+	 */
+	static create(): BVHBoundingBox {
+		return new BVHBoundingBox();
+	}
 
-    /**
-     * Gets the minimum bounding vertex of the BVH tree.
-     * @returns The {@link BVHVertex} representing the minimum bounds.
-     */
-    get min(): BVHVertex { return this._min; }
+	/**
+	 * Gets the minimum bounding vertex of the BVH tree.
+	 * @returns The {@link BVHVertex} representing the minimum bounds.
+	 */
+	get min(): BVHVertex {
+		return this._min;
+	}
 
-    /**
-     * Gets the maximum BVH vertex in the tree.
-     * @returns The maximum {@link BVHVertex} stored in this BVHTree.
-     */
-    get max(): BVHVertex { return this._max; }
+	/**
+	 * Gets the maximum BVH vertex in the tree.
+	 * @returns The maximum {@link BVHVertex} stored in this BVHTree.
+	 */
+	get max(): BVHVertex {
+		return this._max;
+	}
 
-    /**
-     * Indicates whether the BVH tree is empty.
-     * Returns `true` if the tree has not been initialized.
-     */
-    get isEmpty(): boolean { return !this._initialized; }
+	/**
+	 * Indicates whether the BVH tree is empty.
+	 * Returns `true` if the tree has not been initialized.
+	 */
+	get isEmpty(): boolean {
+		return !this._initialized;
+	}
 
-    /**
-     * Adds a vertex to the BVH tree if it is not already present.
-     * Updates the minimum and maximum bounds of the tree to include the new vertex.
-     * Marks the tree as initialized after adding the vertex.
-     *
-     * @param v - The `BVHVertex` to add to the tree.
-     * @returns An `ActionResult` object indicating whether the vertex was added successfully.
-     *          If the vertex is already present, returns `result: false` with a message.
-     */
-    addVertex(v: BVHVertex): ActionResult {
-        const hash = v.getHash();
-        if (this.vertexHashes.has(hash)) {
-            return { result: false, message: "Given point is already included." };
-        }
+	/**
+	 * Adds a vertex to the BVH tree if it is not already present.
+	 * Updates the minimum and maximum bounds of the tree to include the new vertex.
+	 * Marks the tree as initialized after adding the vertex.
+	 *
+	 * @param v - The `BVHVertex` to add to the tree.
+	 * @returns An `ActionResult` object indicating whether the vertex was added successfully.
+	 *          If the vertex is already present, returns `result: false` with a message.
+	 */
+	addVertex(v: BVHVertex): ActionResult {
+		const hash = v.getHash();
+		if (this.vertexHashes.has(hash)) {
+			return {
+				result: false,
+				message: "Given point is already included.",
+			};
+		}
 
-        this.vertexHashes.add(hash);
+		this.vertexHashes.add(hash);
 
-        this._min = new BVHVertex({
-            x: Math.min(this._min.x, v.x),
-            y: Math.min(this._min.y, v.y),
-            z: Math.min(this._min.z, v.z)
-        });
+		this._min = new BVHVertex({
+			x: Math.min(this._min.x, v.x),
+			y: Math.min(this._min.y, v.y),
+			z: Math.min(this._min.z, v.z),
+		});
 
-        this._max = new BVHVertex({
-            x: Math.max(this._max.x, v.x),
-            y: Math.max(this._max.y, v.y),
-            z: Math.max(this._max.z, v.z)
-        });
+		this._max = new BVHVertex({
+			x: Math.max(this._max.x, v.x),
+			y: Math.max(this._max.y, v.y),
+			z: Math.max(this._max.z, v.z),
+		});
 
-        this._initialized = true;
+		this._initialized = true;
 
-        return { result: true };
-    }
+		return { result: true };
+	}
 
-    /**
-     * Calculates and returns the centroid of the bounding volume defined by `_min` and `_max`.
-     * The centroid is computed as the midpoint between the minimum and maximum coordinates.
-     *
-     * @returns {BVHVertex | undefined} The centroid as a `BVHVertex` instance, or `undefined` if the tree is not initialized.
-     */
-    getCentroid(): BVHVertex | undefined {
-        if (!this._initialized) return;
-        return new BVHVertex({
-            x: (this._min.x + this._max.x) * 0.5,
-            y: (this._min.y + this._max.y) * 0.5,
-            z: (this._min.z + this._max.z) * 0.5
-        });
-    }
+	/**
+	 * Calculates and returns the centroid of the bounding volume defined by `_min` and `_max`.
+	 * The centroid is computed as the midpoint between the minimum and maximum coordinates.
+	 *
+	 * @returns {BVHVertex | undefined} The centroid as a `BVHVertex` instance, or `undefined` if the tree is not initialized.
+	 */
+	getCentroid(): BVHVertex | undefined {
+		if (!this._initialized) return;
+		return new BVHVertex({
+			x: (this._min.x + this._max.x) * 0.5,
+			y: (this._min.y + this._max.y) * 0.5,
+			z: (this._min.z + this._max.z) * 0.5,
+		});
+	}
 
-    /**
-     * Calculates and returns the diagonal vector of the bounding box defined by `_min` and `_max`.
-     * The diagonal is computed as the difference between the maximum and minimum coordinates
-     * along each axis (x, y, z).
-     *
-     * @returns {BVHVertex | undefined} A new `BVHVertex` representing the diagonal vector,
-     * or `undefined` if the bounding box is not initialized.
-     */
-    getDiagonal(): BVHVertex | undefined {
-        if (!this._initialized) return;
-        return new BVHVertex({
-            x: this._max.x - this._min.x,
-            y: this._max.y - this._min.y,
-            z: this._max.z - this._min.z
-        });
-    }
+	/**
+	 * Calculates and returns the diagonal vector of the bounding box defined by `_min` and `_max`.
+	 * The diagonal is computed as the difference between the maximum and minimum coordinates
+	 * along each axis (x, y, z).
+	 *
+	 * @returns {BVHVertex | undefined} A new `BVHVertex` representing the diagonal vector,
+	 * or `undefined` if the bounding box is not initialized.
+	 */
+	getDiagonal(): BVHVertex | undefined {
+		if (!this._initialized) return;
+		return new BVHVertex({
+			x: this._max.x - this._min.x,
+			y: this._max.y - this._min.y,
+			z: this._max.z - this._min.z,
+		});
+	}
 }
 
 class BVHVertex {
-    readonly x: number;
-    readonly y: number;
-    readonly z: number;
+	readonly x: number;
+	readonly y: number;
+	readonly z: number;
 
-    private static readonly PRECISION = 1e6;
+	private static readonly PRECISION = 1e6;
 
-    constructor(v: Vertex3d) {
-        this.x = v.x;
-        this.y = v.y;
-        this.z = v.z;
-    }
+	constructor(v: Vertex3d) {
+		this.x = v.x;
+		this.y = v.y;
+		this.z = v.z;
+	}
 
-    getHash(): string {
-        const x = Math.round(this.x * BVHVertex.PRECISION);
-        const y = Math.round(this.y * BVHVertex.PRECISION);
-        const z = Math.round(this.z * BVHVertex.PRECISION);
-        return `${x},${y},${z}`;
-    }
+	getHash(): string {
+		const x = Math.round(this.x * BVHVertex.PRECISION);
+		const y = Math.round(this.y * BVHVertex.PRECISION);
+		const z = Math.round(this.z * BVHVertex.PRECISION);
+		return `${x},${y},${z}`;
+	}
 
-    add(v: BVHVertex): BVHVertex {
-        return new BVHVertex({ x: this.x + v.x, y: this.y + v.y, z: this.z + v.z });
-    }
+	add(v: BVHVertex): BVHVertex {
+		return new BVHVertex({
+			x: this.x + v.x,
+			y: this.y + v.y,
+			z: this.z + v.z,
+		});
+	}
 
-    subtract(v: BVHVertex): BVHVertex {
-        return new BVHVertex({ x: this.x - v.x, y: this.y - v.y, z: this.z - v.z });
-    }
+	subtract(v: BVHVertex): BVHVertex {
+		return new BVHVertex({
+			x: this.x - v.x,
+			y: this.y - v.y,
+			z: this.z - v.z,
+		});
+	}
 
-    dot(v: BVHVertex): number {
-        return this.x * v.x + this.y * v.y + this.z * v.z;
-    }
+	dot(v: BVHVertex): number {
+		return this.x * v.x + this.y * v.y + this.z * v.z;
+	}
 
-    cross(v: BVHVertex): BVHVertex {
-        return new BVHVertex({
-            x: this.y * v.z - this.z * v.y,
-            y: this.z * v.x - this.x * v.z,
-            z: this.x * v.y - this.y * v.x
-        });
-    }
+	cross(v: BVHVertex): BVHVertex {
+		return new BVHVertex({
+			x: this.y * v.z - this.z * v.y,
+			y: this.z * v.x - this.x * v.z,
+			z: this.x * v.y - this.y * v.x,
+		});
+	}
 
-    normalized(): BVHVertex {
-        const length = this.getLength();
-        return new BVHVertex({ x: this.x / length, y: this.y / length, z: this.z / length });
-    }
+	normalized(): BVHVertex {
+		const length = this.getLength();
+		return new BVHVertex({
+			x: this.x / length,
+			y: this.y / length,
+			z: this.z / length,
+		});
+	}
 
-    getLength(): number {
-        return Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2);
-    }
+	getLength(): number {
+		return Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2);
+	}
 
-    multiply(t: number): BVHVertex {
-        return new BVHVertex({ x: this.x * t, y: this.y * t, z: this.z * t });
-    }
+	multiply(t: number): BVHVertex {
+		return new BVHVertex({ x: this.x * t, y: this.y * t, z: this.z * t });
+	}
 
-    toObject(): Vertex3d {
-        return { x: this.x, y: this.y, z: this.z };
-    }
+	toObject(): Vertex3d {
+		return { x: this.x, y: this.y, z: this.z };
+	}
 
-    equals(v: BVHVertex): boolean {
-        return this.getHash() === v.getHash();
-    }
+	equals(v: BVHVertex): boolean {
+		return this.getHash() === v.getHash();
+	}
 
-    clone(): BVHVertex {
-        return new BVHVertex({ x: this.x, y: this.y, z: this.z });
-    }
+	clone(): BVHVertex {
+		return new BVHVertex({ x: this.x, y: this.y, z: this.z });
+	}
 }
-
 
 /**
  * Enumerates and manages a collection of BVHTriangle objects for BVH (Bounding Volume Hierarchy) operations.
- * 
+ *
  * Provides functionality to split the set of triangles into two groups along a specified axis,
  * typically used for spatial partitioning in BVH construction.
  *
@@ -583,31 +932,31 @@ class BVHVertex {
  * ```
  */
 class BVHTriangleEnumerator {
-    constructor(private readonly triangles: BVHTriangle[]) {}
+	constructor(private readonly triangles: BVHTriangle[]) {}
 
-    /**
-     * Splits the current set of triangles into two groups along the specified axis.
-     * The triangles are sorted by their centroid position on the given axis, then divided into two halves.
-     *
-     * @param axis - The axis along which to split the triangles (e.g., X, Y, or Z).
-     * @returns A tuple containing two arrays of `BVHTriangle`:
-     *          - The first array contains the triangles in the lower half.
-     *          - The second array contains the triangles in the upper half.
-     */
-    split(axis: BVHSplitAxis): [BVHTriangle[], BVHTriangle[]] {
-        const sorted = [...this.triangles].sort((a, b) => {
-            const ca = a.getCentroid();
-            const cb = b.getCentroid();
-            return ca[axis] - cb[axis];
-        });
+	/**
+	 * Splits the current set of triangles into two groups along the specified axis.
+	 * The triangles are sorted by their centroid position on the given axis, then divided into two halves.
+	 *
+	 * @param axis - The axis along which to split the triangles (e.g., X, Y, or Z).
+	 * @returns A tuple containing two arrays of `BVHTriangle`:
+	 *          - The first array contains the triangles in the lower half.
+	 *          - The second array contains the triangles in the upper half.
+	 */
+	split(axis: BVHSplitAxis): [BVHTriangle[], BVHTriangle[]] {
+		const sorted = [...this.triangles].sort((a, b) => {
+			const ca = a.getCentroid();
+			const cb = b.getCentroid();
+			return ca[axis] - cb[axis];
+		});
 
-        const mid = Math.floor(sorted.length / 2);
-        return [sorted.slice(0, mid), sorted.slice(mid)];
-    }
+		const mid = Math.floor(sorted.length / 2);
+		return [sorted.slice(0, mid), sorted.slice(mid)];
+	}
 }
 
 enum BVHSplitAxis {
-    X = "x",
-    Y = "y",
-    Z = "z"
+	X = "x",
+	Y = "y",
+	Z = "z",
 }

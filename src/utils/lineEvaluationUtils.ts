@@ -34,9 +34,7 @@ export namespace LineEvaluation {
 	): Vertex3d {
 		const { p0, p1 } = line;
 		const lineVector = VectorUtils.subtract(p1, p0);
-		const lineDirection = VectorUtils.chain(lineVector)
-			.normalize()
-			.value();
+		const lineDirection = VectorUtils.chain(lineVector).normalize().value();
 
 		const moveVector = VectorUtils.scale(lineDirection, dist);
 		const anchor = fromStart ? p0 : p1;
@@ -70,27 +68,15 @@ export namespace LineEvaluation {
 		};
 
 		const d0: Vertex3d = {
-			x: VectorUtils.normalize(
-				VectorUtils.subtract(li0.p1, li0.p0)
-			).x,
-			y: VectorUtils.normalize(
-				VectorUtils.subtract(li0.p1, li0.p0)
-			).y,
-			z: VectorUtils.normalize(
-				VectorUtils.subtract(li0.p1, li0.p0)
-			).z,
+			x: VectorUtils.normalize(VectorUtils.subtract(li0.p1, li0.p0)).x,
+			y: VectorUtils.normalize(VectorUtils.subtract(li0.p1, li0.p0)).y,
+			z: VectorUtils.normalize(VectorUtils.subtract(li0.p1, li0.p0)).z,
 		};
 
 		const d1: Vertex3d = {
-			x: VectorUtils.normalize(
-				VectorUtils.subtract(li1.p1, li1.p0)
-			).x,
-			y: VectorUtils.normalize(
-				VectorUtils.subtract(li1.p1, li1.p0)
-			).y,
-			z: VectorUtils.normalize(
-				VectorUtils.subtract(li1.p1, li1.p0)
-			).z,
+			x: VectorUtils.normalize(VectorUtils.subtract(li1.p1, li1.p0)).x,
+			y: VectorUtils.normalize(VectorUtils.subtract(li1.p1, li1.p0)).y,
+			z: VectorUtils.normalize(VectorUtils.subtract(li1.p1, li1.p0)).z,
 		};
 
 		const d0PlaneXY: Vertex3d = VectorUtils.normalize({
@@ -105,9 +91,7 @@ export namespace LineEvaluation {
 			z: 0,
 		});
 
-		const det =
-			-(d0PlaneXY.x * d1PlaneXY.y) +
-			d1PlaneXY.x * d0PlaneXY.y;
+		const det = -(d0PlaneXY.x * d1PlaneXY.y) + d1PlaneXY.x * d0PlaneXY.y;
 		if (Math.abs(det) < TOLERANCE_LINE_EVALUATION) {
 			return {
 				result: false,
@@ -204,16 +188,8 @@ export namespace LineEvaluation {
 		if (fromExtended) {
 			return { result: true, pt: ptQ2 };
 		} else {
-			const paramPtQ2 = getParameterOnLine(
-				li0.p0,
-				li0.p1,
-				ptQ2
-			);
-			const paramPtR2 = getParameterOnLine(
-				li1.p0,
-				li1.p1,
-				ptR2
-			);
+			const paramPtQ2 = getParameterOnLine(li0.p0, li0.p1, ptQ2);
+			const paramPtR2 = getParameterOnLine(li1.p0, li1.p1, ptR2);
 
 			if (
 				-TOLERANCE_LINE_EVALUATION <= paramPtQ2 &&
@@ -225,7 +201,8 @@ export namespace LineEvaluation {
 			} else {
 				return {
 					result: false,
-					message: "One of the points are placed on outside the line's domain.",
+					message:
+						"One of the points are placed on outside the line's domain.",
 				};
 			}
 		}
@@ -267,8 +244,7 @@ export namespace LineEvaluation {
 		direction: Vertex3d,
 		pt: Vertex3d
 	): { pt: Vertex3d; t: number } | undefined {
-		if (VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION)
-			return;
+		if (VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION) return;
 
 		const norm = VectorUtils.normalize(direction);
 		const dSize = VectorUtils.getSize(norm);
@@ -289,8 +265,7 @@ export namespace LineEvaluation {
 		pt: Vertex3d
 	): { pt: Vertex3d; t: number } | undefined {
 		const direction = VectorUtils.subtract(line.p1, line.p0);
-		if (VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION)
-			return;
+		if (VectorUtils.getSize(direction) < TOLERANCE_LINE_EVALUATION) return;
 
 		const anchor = line.p0;
 		const ptMoved = VectorUtils.subtract(pt, anchor);

@@ -65,11 +65,7 @@ export namespace PolygonUtils {
 		const p0p2: Line = { p0: p0, p1: p2 };
 		const p1p3: Line = { p0: p1, p1: p3 };
 
-		const intersection = LineEvaluation.getIntersection(
-			p0p2,
-			p1p3,
-			false
-		);
+		const intersection = LineEvaluation.getIntersection(p0p2, p1p3, false);
 
 		if (!intersection) {
 			const p0p2Test =
@@ -159,10 +155,7 @@ export namespace PolygonUtils {
 		const otherVectors: Vertex3d[] = [];
 		pts.forEach((pt, index) => {
 			if (index > 2) {
-				const otherVector = VectorUtils.subtract(
-					pt,
-					pts[0]
-				);
+				const otherVector = VectorUtils.subtract(pt, pts[0]);
 				otherVectors.push(otherVector);
 			}
 		});
@@ -179,5 +172,78 @@ export namespace PolygonUtils {
 		}
 
 		return { result: true, ptsNotEnough: false, notPlanar: false };
+	}
+
+	/**
+	 * Computes the barycentric coordinates (u, v, w) of a point `p` with respect to a triangle defined by vertices `a`, `b`, and `c` in 2D space.
+	 *
+	 * Barycentric coordinates are useful for interpolation, point-in-triangle tests, and other geometric computations.
+	 *
+	 * @param p - The point for which to compute barycentric coordinates.
+	 * @param a - The first vertex of the triangle.
+	 * @param b - The second vertex of the triangle.
+	 * @param c - The third vertex of the triangle.
+	 * @param eps - Optional epsilon value for floating-point comparison to avoid division by zero (default is 1e-12).
+	 * @returns An object containing the barycentric coordinates `{ u, v, w }` if the triangle is valid; otherwise, `undefined`.
+	 */
+	export function barycentric2D(
+		p: Vertex2d,
+		a: Vertex2d,
+		b: Vertex2d,
+		c: Vertex2d,
+		eps = 1e-12
+	): { u: number; v: number; w: number } | undefined {
+		const v0 = { x: b.x - a.x, y: b.y - a.y };
+		const v1 = { x: c.x - a.x, y: c.y - a.y };
+		const v2 = { x: p.x - a.x, y: p.y - a.y };
+
+		const d00 = v0.x * v0.x + v0.y * v0.y;
+		const d01 = v0.x * v1.x + v0.y * v1.y;
+		const d11 = v1.x * v1.x + v1.y * v1.y;
+		const d20 = v2.x * v0.x + v2.y * v0.y;
+		const d21 = v2.x * v1.x + v2.y * v1.y;
+
+		const denom = d00 * d11 - d01 * d01;
+		if (Math.abs(denom) < eps) return;
+
+		const v = (d11 * d20 - d01 * d21) / denom;
+		const w = (d00 * d21 - d01 * d20) / denom;
+		const u = 1 - v - w;
+		return { u, v, w };
+	}
+
+	export function pointInTriangle(
+		pt: Vertex3d,
+		tri: Triangle,
+		eps = 1e-6
+	): boolean {
+		const A = tri.p0;
+		const B = tri.p1;
+		const C = tri.p2;
+
+		const n = VectorUtils.cross(
+			VectorUtils.subtract(B, A),
+			VectorUtils.subtract(C, A)
+		);
+
+		const dist = Math.abs(VectorUtils.dot(n, VectorUtils.subtract(pt, A)));
+		if (dist > eps * Math.max(VectorUtils.getSize(n), 1)) return false;
+
+		const v0 = VectorUtils.subtract(B, A);
+		const v1 = VectorUtils.subtract(C, A);
+		const v2 = VectorUtils.subtract(pt, A);
+
+		const d00 = VectorUtils.dot(v0, v0);
+		const d01 = VectorUtils.dot(v0, v1);
+		const d11 = VectorUtils.dot(v1, v1);
+		const d20 = VectorUtils.dot(v2, v0);
+		const d21 = VectorUtils.dot(v2, v1);
+		const denom = d00 * d11 - d01 * d01;
+
+		if (Math.abs(denom) < eps) return false;
+		const v = (d11 * d20 - d01 * d21) / denom;
+		const w = (d00 * d21 - d01 * d20) / denom;
+		const u = 1 - v - w;
+		return u >= -eps && v >= -eps && w >= -eps;
 	}
 }
