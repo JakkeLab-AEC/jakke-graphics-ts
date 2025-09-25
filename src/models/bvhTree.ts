@@ -1,10 +1,20 @@
 import { Vertex3d } from "./types/basicGeometries";
 import { ActionResult } from "./types/errorMessages";
 
+enum ToleranceTypes {
+    IsPointInside = "IsPointInside",
+}
+
 /**
  * BVHTree for fast traverse of triangles.
  */
 export class BVHTree {
+    constructor() {
+        this._tolerances = {
+            [ToleranceTypes.IsPointInside]: 1e-6,
+        };
+    }
+
     /**
      * Triangles included.
      */
@@ -19,21 +29,35 @@ export class BVHTree {
     private rightChild?: BVHTree;
     private parent?: BVHTree;
     private _boundingBox: BVHBoundingBox = BVHBoundingBox.create();
+    private _tolerances: Record<ToleranceTypes, number>;
 
     /**
      * Get bounding box of this BVHTree.
      */
-    get boundingBox(): BVHBoundingBox { return this._boundingBox; }
+    get boundingBox(): BVHBoundingBox {
+        return this._boundingBox;
+    }
+
+    getTolerance(type: ToleranceTypes): number {
+        return this._tolerances[type];
+    }
+
+    setTolerance(type: ToleranceTypes, tolerance: number) {
+        this._tolerances[type] = tolerance;
+    }
 
     /**
      * Add triangle at this three.
-     * @param triangle 
+     * @param triangle
      * @returns Result of adding triangle action.
      */
     addTriangle(triangle: BVHTriangle): ActionResult {
         const hash = triangle.getHash();
         if (this.triangleHashes.has(hash)) {
-            return { result: false, message: "Given triangle is already included." };
+            return {
+                result: false,
+                message: "Given triangle is already included.",
+            };
         }
 
         this.triangles.push(triangle);
@@ -48,7 +72,7 @@ export class BVHTree {
 
     /**
      * Build BVHTree's structure.
-     * @returns 
+     * @returns
      */
     calculateTree(): BVHTree {
         const sortedTriangles = this.getSortedTriangles();
@@ -57,18 +81,18 @@ export class BVHTree {
 
     /**
      * Internal method for calculating the tree structure.
-     * @param triangles 
-     * @returns 
+     * @param triangles
+     * @returns
      */
     private buildBVHTree(triangles: BVHTriangle[]): BVHTree {
         if (triangles.length <= 1) {
             const leaf = new BVHTree();
-            triangles.forEach(t => leaf.addTriangle(t));
+            triangles.forEach((t) => leaf.addTriangle(t));
             return leaf;
         }
 
         const node = new BVHTree();
-        triangles.forEach(t => node.addTriangle(t));
+        triangles.forEach((t) => node.addTriangle(t));
 
         const diagonal = node.boundingBox.getDiagonal();
         if (!diagonal) {
@@ -106,18 +130,20 @@ export class BVHTree {
 
     /**
      * Internal method for sorting triangles.
-     * @returns 
+     * @returns
      */
     private getSortedTriangles(): BVHTriangle[] {
         const diagonal = this._boundingBox?.getDiagonal();
         if (!diagonal) {
-            throw new Error("Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting.");
+            throw new Error(
+                "Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting."
+            );
         }
-    
+
         const isXMajor = diagonal.x > diagonal.y;
-    
+
         return this.triangles
-            .map(t => t.clone())
+            .map((t) => t.clone())
             .sort((a, b) => {
                 const ca = a.getCentroid();
                 const cb = b.getCentroid();
@@ -129,7 +155,7 @@ export class BVHTree {
 
     /**
      * Get all nodes included in this tree.
-     * @returns 
+     * @returns
      */
     getAllNodes(): BVHTree[] {
         const nodes: BVHTree[] = [];
@@ -139,15 +165,15 @@ export class BVHTree {
 
     /**
      * Get all node's bounding box.
-     * @returns 
+     * @returns
      */
     getAllBoundingBoxes(): BVHBoundingBox[] {
-        return this.getAllNodes().map(n => n._boundingBox);
+        return this.getAllNodes().map((n) => n._boundingBox);
     }
 
     /**
      * Internal method for traverse tree for collecting all nodes.
-     * @param nodes 
+     * @param nodes
      */
     private traverseTree(nodes: BVHTree[]): void {
         nodes.push(this);
@@ -157,7 +183,7 @@ export class BVHTree {
 
     /**
      * Get root node of this tree.
-     * @returns 
+     * @returns
      */
     getRoot(): BVHTree {
         let current: BVHTree = this;
@@ -173,11 +199,15 @@ export class BVHTree {
      * Currently, it returns only the first collision point.
      * @param p1 The start point of line.
      * @param p2 The end point of line.
-     * @param onlyOnLine Parameter for testing the getting collision point. 
+     * @param onlyOnLine Parameter for testing the getting collision point.
      *                   When this set true, it returns the collision point including outbound of the line.
      * @returns Intersection point when only the intersection exists.
      */
-    getRayCollision(p1: Vertex3d, p2: Vertex3d, onlyOnLine: boolean): Vertex3d | undefined {
+    getRayCollision(
+        p1: Vertex3d,
+        p2: Vertex3d,
+        onlyOnLine: boolean
+    ): Vertex3d | undefined {
         if (!this.isRayCollideAABB(p1, p2)) return;
 
         if (!this.leftChild && !this.rightChild) {
@@ -185,34 +215,59 @@ export class BVHTree {
                 const ptTest = triangle.getPointOnTrianglePlane(p1, p2);
                 if (!ptTest) continue;
 
-                const onLine = ptTest.subtract(new BVHVertex(p1))
-                    .dot(ptTest.subtract(new BVHVertex(p2))) <= 0;
+                const onLine =
+                    ptTest
+                        .subtract(new BVHVertex(p1))
+                        .dot(ptTest.subtract(new BVHVertex(p2))) <= 0;
 
                 if (!onlyOnLine || onLine) return ptTest;
             }
         }
 
-        return this.leftChild?.getRayCollision(p1, p2, onlyOnLine)
-            || this.rightChild?.getRayCollision(p1, p2, onlyOnLine);
+        return (
+            this.leftChild?.getRayCollision(p1, p2, onlyOnLine) ||
+            this.rightChild?.getRayCollision(p1, p2, onlyOnLine)
+        );
     }
 
     /**
      * Internal method for determine the collision between line and bounding box.
      * @param p1 The start point of line.
      * @param p2 The end point of line.
-     * @returns 
+     * @returns
      */
     private isRayCollideAABB(p1: Vertex3d, p2: Vertex3d): boolean {
         const ptMin = this._boundingBox.min;
         const ptMax = this._boundingBox.max;
 
         const intersections = [
-            this.raycastOnPlane(p1, p2, "z", p2.z - p1.z > 0 ? ptMin.z : ptMax.z, ptMin, ptMax),
-            this.raycastOnPlane(p1, p2, "x", p2.x - p1.x > 0 ? ptMin.x : ptMax.x, ptMin, ptMax),
-            this.raycastOnPlane(p1, p2, "y", p2.y - p1.y > 0 ? ptMin.y : ptMax.y, ptMin, ptMax)
+            this.raycastOnPlane(
+                p1,
+                p2,
+                "z",
+                p2.z - p1.z > 0 ? ptMin.z : ptMax.z,
+                ptMin,
+                ptMax
+            ),
+            this.raycastOnPlane(
+                p1,
+                p2,
+                "x",
+                p2.x - p1.x > 0 ? ptMin.x : ptMax.x,
+                ptMin,
+                ptMax
+            ),
+            this.raycastOnPlane(
+                p1,
+                p2,
+                "y",
+                p2.y - p1.y > 0 ? ptMin.y : ptMax.y,
+                ptMin,
+                ptMax
+            ),
         ];
 
-        return intersections.filter(pt => pt !== undefined).length === 1;
+        return intersections.filter((pt) => pt !== undefined).length === 1;
     }
 
     /**
@@ -220,12 +275,19 @@ export class BVHTree {
      * @param p1 The start point of line.
      * @param p2 The end point of line.
      * @param axis x, y, z can be set.
-     * @param value 
+     * @param value
      * @param ptMin The minimum point of bounding box.
      * @param ptMax The maximum point of bounding box.
-     * @returns 
+     * @returns
      */
-    private raycastOnPlane(p1: Vertex3d, p2: Vertex3d, axis: keyof Vertex3d, value: number, ptMin: Vertex3d, ptMax: Vertex3d): Vertex3d | undefined {
+    private raycastOnPlane(
+        p1: Vertex3d,
+        p2: Vertex3d,
+        axis: keyof Vertex3d,
+        value: number,
+        ptMin: Vertex3d,
+        ptMax: Vertex3d
+    ): Vertex3d | undefined {
         const delta = p2[axis] - p1[axis];
         if (delta === 0) return undefined;
 
@@ -233,23 +295,33 @@ export class BVHTree {
         const pt = {
             x: p1.x + t * (p2.x - p1.x),
             y: p1.y + t * (p2.y - p1.y),
-            z: p1.z + t * (p2.z - p1.z)
+            z: p1.z + t * (p2.z - p1.z),
         };
 
         return this.isPointInside(pt, ptMin, ptMax) ? pt : undefined;
     }
 
     /**
-     * 
-     * @param pt 
-     * @param min 
-     * @param max 
-     * @returns 
+     *
+     * @param pt
+     * @param min
+     * @param max
+     * @returns
      */
-    private isPointInside(pt: Vertex3d, min: Vertex3d, max: Vertex3d): boolean {
-        return min.x <= pt.x && pt.x <= max.x
-            && min.y <= pt.y && pt.y <= max.y
-            && min.z <= pt.z && pt.z <= max.z;
+    private isPointInside(
+        pt: Vertex3d,
+        min: Vertex3d,
+        max: Vertex3d,
+        tolerance = this._tolerances[ToleranceTypes.IsPointInside]
+    ): boolean {
+        return (
+            min.x - tolerance <= pt.x &&
+            pt.x <= max.x + tolerance &&
+            min.y - tolerance <= pt.y &&
+            pt.y <= max.y + tolerance &&
+            min.z - tolerance <= pt.z &&
+            pt.z <= max.z + tolerance
+        );
     }
 }
 
@@ -268,17 +340,17 @@ export class BVHTriangle {
 
     /**
      * The third vertex of the BVH structure.
-     * 
+     *
      * @readonly
      */
     readonly v3: BVHVertex;
-    
+
     /**
      * Creates a new BVHTriangle instance from three vertices.
-     * 
+     *
      * Each vertex is wrapped in a BVHVertex. The constructor checks for duplicate vertices
      * by comparing their hashes. If all three vertices are identical, an error is thrown.
-     * 
+     *
      * @param v1 - The first vertex of the triangle.
      * @param v2 - The second vertex of the triangle.
      * @param v3 - The third vertex of the triangle.
@@ -295,7 +367,9 @@ export class BVHTriangle {
 
         const isDuplicated = dupV1V2 && dupV2V3 && dupV3V1;
         if (isDuplicated) {
-            throw new Error("Cannot create BVHTriangle with all identical vertices");
+            throw new Error(
+                "Cannot create BVHTriangle with all identical vertices"
+            );
         }
 
         this.v1 = bvhV1;
@@ -314,7 +388,7 @@ export class BVHTriangle {
         return {
             x: (this.v1.x + this.v2.x + this.v3.x) / 3,
             y: (this.v1.y + this.v2.y + this.v3.y) / 3,
-            z: (this.v1.z + this.v2.z + this.v3.z) / 3
+            z: (this.v1.z + this.v2.z + this.v3.z) / 3,
         };
     }
 
@@ -330,11 +404,15 @@ export class BVHTriangle {
 
     /**
      * Creates a deep copy of the current `BVHTriangle` instance.
-     * 
+     *
      * @returns A new `BVHTriangle` object with cloned vertex data.
      */
     clone(): BVHTriangle {
-        return new BVHTriangle(this.v1.toObject(), this.v2.toObject(), this.v3.toObject());
+        return new BVHTriangle(
+            this.v1.toObject(),
+            this.v2.toObject(),
+            this.v3.toObject()
+        );
     }
 
     /**
@@ -364,7 +442,10 @@ export class BVHTriangle {
      * @param pt2 - The ending vertex of the line segment.
      * @returns The intersection point as a `BVHVertex` if it is inside the triangle, or `undefined` otherwise.
      */
-    getPointOnTrianglePlane(pt1: Vertex3d, pt2: Vertex3d): BVHVertex | undefined {
+    getPointOnTrianglePlane(
+        pt1: Vertex3d,
+        pt2: Vertex3d
+    ): BVHVertex | undefined {
         if (this.isDetZero(pt1, pt2)) return;
 
         const V1 = this.v1;
@@ -387,7 +468,7 @@ export class BVHTriangle {
 
         const result = V1.multiply(u).add(V2.multiply(v)).add(V3.multiply(w));
 
-        const validParams = [u, v, w].every(val => val >= 0 && val <= 1);
+        const validParams = [u, v, w].every((val) => val >= 0 && val <= 1);
         return validParams ? result : undefined;
     }
 }
@@ -418,19 +499,25 @@ export class BVHBoundingBox {
      * Gets the minimum bounding vertex of the BVH tree.
      * @returns The {@link BVHVertex} representing the minimum bounds.
      */
-    get min(): BVHVertex { return this._min; }
+    get min(): BVHVertex {
+        return this._min;
+    }
 
     /**
      * Gets the maximum BVH vertex in the tree.
      * @returns The maximum {@link BVHVertex} stored in this BVHTree.
      */
-    get max(): BVHVertex { return this._max; }
+    get max(): BVHVertex {
+        return this._max;
+    }
 
     /**
      * Indicates whether the BVH tree is empty.
      * Returns `true` if the tree has not been initialized.
      */
-    get isEmpty(): boolean { return !this._initialized; }
+    get isEmpty(): boolean {
+        return !this._initialized;
+    }
 
     /**
      * Adds a vertex to the BVH tree if it is not already present.
@@ -444,7 +531,10 @@ export class BVHBoundingBox {
     addVertex(v: BVHVertex): ActionResult {
         const hash = v.getHash();
         if (this.vertexHashes.has(hash)) {
-            return { result: false, message: "Given point is already included." };
+            return {
+                result: false,
+                message: "Given point is already included.",
+            };
         }
 
         this.vertexHashes.add(hash);
@@ -452,13 +542,13 @@ export class BVHBoundingBox {
         this._min = new BVHVertex({
             x: Math.min(this._min.x, v.x),
             y: Math.min(this._min.y, v.y),
-            z: Math.min(this._min.z, v.z)
+            z: Math.min(this._min.z, v.z),
         });
 
         this._max = new BVHVertex({
             x: Math.max(this._max.x, v.x),
             y: Math.max(this._max.y, v.y),
-            z: Math.max(this._max.z, v.z)
+            z: Math.max(this._max.z, v.z),
         });
 
         this._initialized = true;
@@ -477,7 +567,7 @@ export class BVHBoundingBox {
         return new BVHVertex({
             x: (this._min.x + this._max.x) * 0.5,
             y: (this._min.y + this._max.y) * 0.5,
-            z: (this._min.z + this._max.z) * 0.5
+            z: (this._min.z + this._max.z) * 0.5,
         });
     }
 
@@ -494,7 +584,7 @@ export class BVHBoundingBox {
         return new BVHVertex({
             x: this._max.x - this._min.x,
             y: this._max.y - this._min.y,
-            z: this._max.z - this._min.z
+            z: this._max.z - this._min.z,
         });
     }
 }
@@ -520,11 +610,19 @@ class BVHVertex {
     }
 
     add(v: BVHVertex): BVHVertex {
-        return new BVHVertex({ x: this.x + v.x, y: this.y + v.y, z: this.z + v.z });
+        return new BVHVertex({
+            x: this.x + v.x,
+            y: this.y + v.y,
+            z: this.z + v.z,
+        });
     }
 
     subtract(v: BVHVertex): BVHVertex {
-        return new BVHVertex({ x: this.x - v.x, y: this.y - v.y, z: this.z - v.z });
+        return new BVHVertex({
+            x: this.x - v.x,
+            y: this.y - v.y,
+            z: this.z - v.z,
+        });
     }
 
     dot(v: BVHVertex): number {
@@ -535,13 +633,17 @@ class BVHVertex {
         return new BVHVertex({
             x: this.y * v.z - this.z * v.y,
             y: this.z * v.x - this.x * v.z,
-            z: this.x * v.y - this.y * v.x
+            z: this.x * v.y - this.y * v.x,
         });
     }
 
     normalized(): BVHVertex {
         const length = this.getLength();
-        return new BVHVertex({ x: this.x / length, y: this.y / length, z: this.z / length });
+        return new BVHVertex({
+            x: this.x / length,
+            y: this.y / length,
+            z: this.z / length,
+        });
     }
 
     getLength(): number {
@@ -565,10 +667,9 @@ class BVHVertex {
     }
 }
 
-
 /**
  * Enumerates and manages a collection of BVHTriangle objects for BVH (Bounding Volume Hierarchy) operations.
- * 
+ *
  * Provides functionality to split the set of triangles into two groups along a specified axis,
  * typically used for spatial partitioning in BVH construction.
  *
@@ -609,5 +710,5 @@ class BVHTriangleEnumerator {
 enum BVHSplitAxis {
     X = "x",
     Y = "y",
-    Z = "z"
+    Z = "z",
 }
