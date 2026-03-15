@@ -6,6 +6,7 @@ export type BVHHit = {
 	point: Vertex3d;
 	t: number;
 	triangle: BVHTriangle;
+	isWithinTriangle: boolean;
 };
 
 /**
@@ -101,8 +102,8 @@ export class BVHTree {
 			diagonal.x >= diagonal.y && diagonal.x >= diagonal.z
 				? BVHSplitAxis.X
 				: diagonal.y >= diagonal.z
-				? BVHSplitAxis.Y
-				: BVHSplitAxis.Z;
+					? BVHSplitAxis.Y
+					: BVHSplitAxis.Z;
 
 		const enumerator = new BVHTriangleEnumerator(triangles);
 		const [leftTriangles, rightTriangles] = enumerator.split(axis);
@@ -124,7 +125,7 @@ export class BVHTree {
 		const diagonal = this._boundingBox?.getDiagonal();
 		if (!diagonal) {
 			throw new Error(
-				"Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting."
+				"Bounding box diagonal is not defined. Make sure to call calculateBoundingBox() before sorting.",
 			);
 		}
 
@@ -187,14 +188,14 @@ export class BVHTree {
 	 * Currently, it returns only the first collision point.
 	 * @param p1 The start point of line.
 	 * @param p2 The end point of line.
-	 * @param onlyOnLine Parameter for testing the getting collision point.
+	 * @param includeOutboundOfLine Parameter for testing the getting collision point.
 	 *                   When this set true, it returns the collision point including outbound of the line.
 	 * @returns Intersection point when only the intersection exists.
 	 */
 	getRayCollision(
 		p1: Vertex3d,
 		p2: Vertex3d,
-		onlyOnLine: boolean
+		includeOutboundOfLine: boolean,
 	): Vertex3d | undefined {
 		if (!this.isRayCollideAABB(p1, p2)) return;
 
@@ -204,17 +205,17 @@ export class BVHTree {
 				if (!ptTest) continue;
 
 				const onLine =
-					ptTest
+					ptTest.pt
 						.subtract(new BVHVertex(p1))
-						.dot(ptTest.subtract(new BVHVertex(p2))) <= 0;
+						.dot(ptTest.pt.subtract(new BVHVertex(p2))) <= 0;
 
-				if (!onlyOnLine || onLine) return ptTest;
+				if (!includeOutboundOfLine || onLine) return ptTest.pt;
 			}
 		}
 
 		return (
-			this.leftChild?.getRayCollision(p1, p2, onlyOnLine) ||
-			this.rightChild?.getRayCollision(p1, p2, onlyOnLine)
+			this.leftChild?.getRayCollision(p1, p2, includeOutboundOfLine) ||
+			this.rightChild?.getRayCollision(p1, p2, includeOutboundOfLine)
 		);
 	}
 
@@ -235,7 +236,7 @@ export class BVHTree {
 				"z",
 				p2.z - p1.z > 0 ? ptMin.z : ptMax.z,
 				ptMin,
-				ptMax
+				ptMax,
 			),
 			this.raycastOnPlane(
 				p1,
@@ -243,7 +244,7 @@ export class BVHTree {
 				"x",
 				p2.x - p1.x > 0 ? ptMin.x : ptMax.x,
 				ptMin,
-				ptMax
+				ptMax,
 			),
 			this.raycastOnPlane(
 				p1,
@@ -251,7 +252,7 @@ export class BVHTree {
 				"y",
 				p2.y - p1.y > 0 ? ptMin.y : ptMax.y,
 				ptMin,
-				ptMax
+				ptMax,
 			),
 		];
 
@@ -274,7 +275,7 @@ export class BVHTree {
 		axis: keyof Vertex3d,
 		value: number,
 		ptMin: Vertex3d,
-		ptMax: Vertex3d
+		ptMax: Vertex3d,
 	): Vertex3d | undefined {
 		const delta = p2[axis] - p1[axis];
 		if (delta === 0) return undefined;
@@ -326,7 +327,7 @@ export class BVHTree {
 		p1: Vertex3d,
 		min: Vertex3d,
 		max: Vertex3d,
-		eps = 1e-12
+		eps = 1e-12,
 	): { tMin: number; tMax: number } | undefined {
 		const dx = p1.x - p0.x,
 			dy = p1.y - p0.y,
@@ -379,7 +380,7 @@ export class BVHTree {
 	private static getParameterOnLine(
 		p0: Vertex3d,
 		p1: Vertex3d,
-		pt: Vertex3d
+		pt: Vertex3d,
 	): number {
 		const dx = p1.x - p0.x,
 			dy = p1.y - p0.y,
@@ -408,11 +409,14 @@ export class BVHTree {
 		p1: Vertex3d,
 		options?: {
 			includeOutsideSegment?: boolean;
+			includeOutsideTriangle?: boolean;
 			epsilon?: number;
 			dedupeBy?: "t" | "point";
-		}
+		},
 	): BVHHit[] {
 		const includeOutside = options?.includeOutsideSegment ?? false;
+		const includeOustsideTriangle =
+			options?.includeOutsideTriangle ?? false;
 		const eps = options?.epsilon ?? 1e-6;
 		const dedupeBy = options?.dedupeBy ?? "t";
 
@@ -422,21 +426,30 @@ export class BVHTree {
 			p0,
 			p1,
 			this._boundingBox.min,
-			this._boundingBox.max
+			this._boundingBox.max,
 		);
 		if (!aabbHit) return hits;
 
 		if (!this.leftChild && !this.rightChild) {
 			for (const tri of this.triangles) {
-				const pt = tri.getPointOnTrianglePlane(p0, p1);
-				if (!pt) continue;
+				const ptArg = tri.getPointOnTrianglePlane(
+					p0,
+					p1,
+					includeOustsideTriangle,
+				);
+				if (!ptArg) continue;
 
-				const ptObj = pt.toObject();
+				const ptObj = ptArg.pt.toObject();
 				const t = BVHTree.getParameterOnLine(p0, p1, ptObj);
 
 				if (!includeOutside && (t < -eps || t > 1 + eps)) continue;
 
-				hits.push({ point: ptObj, t, triangle: tri });
+				hits.push({
+					point: ptObj,
+					t,
+					triangle: tri,
+					isWithinTriangle: ptArg.isWithinTriangle,
+				});
 			}
 		} else {
 			if (this.leftChild)
@@ -462,7 +475,7 @@ export class BVHTree {
 				const seen = new Set<string>();
 				for (const h of hits) {
 					const key = `${q(h.point.x)},${q(h.point.y)},${q(
-						h.point.z
+						h.point.z,
 					)}`;
 					if (!seen.has(key)) {
 						seen.add(key);
@@ -482,7 +495,7 @@ export class BVHTree {
 		// BVH를 이용해 pt가 어떤 삼각형 내부(경계 포함)에 있는지 빠르게 검사
 		const isPointInsideAnyTriangle = (
 			node: BVHTree,
-			pt: Vertex3d
+			pt: Vertex3d,
 		): boolean => {
 			const min = node._boundingBox.min.toObject();
 			const max = node._boundingBox.max.toObject();
@@ -578,6 +591,11 @@ export class BVHTriangle {
 	 */
 	readonly source?: BVHTriangle;
 
+	private _faceIndexOriginal: number;
+	get faceIndexOriginal(): number {
+		return this._faceIndexOriginal;
+	}
+
 	/**
 	 * Creates a new BVHTriangle instance from three vertices.
 	 *
@@ -593,7 +611,8 @@ export class BVHTriangle {
 		v1: Vertex3d,
 		v2: Vertex3d,
 		v3: Vertex3d,
-		source?: BVHTriangle
+		source?: BVHTriangle,
+		faceIndexOriginal = -1,
 	) {
 		const bvhV1 = new BVHVertex(v1);
 		const bvhV2 = new BVHVertex(v2);
@@ -606,7 +625,7 @@ export class BVHTriangle {
 		const isDuplicated = dupV1V2 && dupV2V3 && dupV3V1;
 		if (isDuplicated) {
 			throw new Error(
-				"Cannot create BVHTriangle with all identical vertices"
+				"Cannot create BVHTriangle with all identical vertices",
 			);
 		}
 
@@ -614,6 +633,7 @@ export class BVHTriangle {
 		this.v2 = bvhV2;
 		this.v3 = bvhV3;
 		this.source = source;
+		this._faceIndexOriginal = faceIndexOriginal;
 	}
 
 	/**
@@ -651,7 +671,8 @@ export class BVHTriangle {
 			this.v1.toObject(),
 			this.v2.toObject(),
 			this.v3.toObject(),
-			this.source ?? undefined
+			this.source ?? undefined,
+			this._faceIndexOriginal,
 		);
 	}
 
@@ -680,12 +701,14 @@ export class BVHTriangle {
 	 *
 	 * @param pt1 - The starting vertex of the line segment.
 	 * @param pt2 - The ending vertex of the line segment.
+	 * @param onlyWithinTriangle - Option whether to get point only within the triangle.
 	 * @returns The intersection point as a `BVHVertex` if it is inside the triangle, or `undefined` otherwise.
 	 */
 	getPointOnTrianglePlane(
 		pt1: Vertex3d,
-		pt2: Vertex3d
-	): BVHVertex | undefined {
+		pt2: Vertex3d,
+		onlyWithinTriangle = true,
+	): { pt: BVHVertex; isWithinTriangle: boolean } | undefined {
 		if (this.isDetZero(pt1, pt2)) return;
 
 		const V1 = this.v1;
@@ -709,7 +732,13 @@ export class BVHTriangle {
 		const result = V1.multiply(u).add(V2.multiply(v)).add(V3.multiply(w));
 
 		const validParams = [u, v, w].every((val) => val >= 0 && val <= 1);
-		return validParams ? result : undefined;
+		if (onlyWithinTriangle) {
+			return validParams
+				? { pt: result, isWithinTriangle: true }
+				: undefined;
+		}
+
+		return { pt: result, isWithinTriangle: validParams };
 	}
 
 	toObject(): Triangle {
