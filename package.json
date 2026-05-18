@@ -8,7 +8,10 @@
         "dist"
     ],
     "scripts": {
-        "build": "node pack.config.js"
+        "build": "node pack.config.js",
+        "typecheck": "tsc --noEmit",
+        "test": "jest",
+        "docs": "typedoc --options typedoc.json"
     },
     "publishConfig": {
         "access": "public"

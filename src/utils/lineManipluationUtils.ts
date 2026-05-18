@@ -1,7 +1,7 @@
 import { Line } from "../models/types/basicGeometries";
 import { VectorUtils } from "./vectorUtils";
 
-type Direction = 'left'|'right';
+export type Direction = 'left'|'right';
 
 /**
  * A collection of utility functions for manipulating lines in 2D space,

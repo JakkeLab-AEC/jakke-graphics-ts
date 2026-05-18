@@ -1,4 +1,4 @@
-import { PolygonUtils } from "utils/polygonUtils";
+import { PolygonUtils } from "../utils/polygonUtils";
 import { Line, Polyline3d, Triangle, Vertex3d } from "./types/basicGeometries";
 import { ActionResult } from "./types/errorMessages";
 
@@ -866,7 +866,7 @@ export class BVHBoundingBox {
 	}
 }
 
-class BVHVertex {
+export class BVHVertex {
 	readonly x: number;
 	readonly y: number;
 	readonly z: number;

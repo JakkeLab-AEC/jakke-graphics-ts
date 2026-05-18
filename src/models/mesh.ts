@@ -167,7 +167,7 @@ export class Mesh {
 		hitsWithinTriangle.push(...p0Hits, ...p0HitsReverse);
 
 		if (hitsWithinTriangle.length === 0) {
-			this.findStartPtFromOutside(p0, q0);
+			this.findStartPtFromOutside(p0, q0, VectorUtils.subtract(p1, p0));
 		} else {
 			// Face에 투영이 가능한 경우, t값이 가장 큰 것을 시작점으로 설정
 			const sortedHits = hitsWithinTriangle.sort((a, b) => b.t - a.t);

@@ -150,10 +150,16 @@ describe('Test Polyline Utils', () => {
         const liMessage = convertLineData(plSegments);
 
         console.dir(test, {depth: null});
-        const client = connectToTester(TESTER_PORT);
-        client.on("open", () => {
-            client.send(JSON.stringify(ptMessage));
-            client.send(JSON.stringify(liMessage));
-        });
+        if(process.env.JAKKE_GEOMETRY_TESTER_WS === "1") {
+            const client = connectToTester(TESTER_PORT);
+            client.on("open", () => {
+                client.send(JSON.stringify(ptMessage));
+                client.send(JSON.stringify(liMessage));
+                client.close();
+            });
+            client.on("error", () => {
+                client.close();
+            });
+        }
     });
 });

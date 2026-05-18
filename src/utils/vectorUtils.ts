@@ -2,7 +2,7 @@ import { Line, Vertex2d, Vertex3d } from "../models/types/basicGeometries";
 
 const TOLERANCE_PARALLEL = 1e-6;
 
-interface VectorChain {
+export interface VectorChain {
 	add(v: Vertex3d): VectorChain;
 	subtract(v: Vertex3d): VectorChain;
 	scale(scalar: number): VectorChain;

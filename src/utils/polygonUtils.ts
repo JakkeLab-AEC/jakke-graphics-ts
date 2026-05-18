@@ -8,16 +8,16 @@ import { LineEvaluation } from "./lineEvaluationUtils";
 import { VectorUtils } from "./vectorUtils";
 
 export namespace PolygonUtils {
-	type SplittedTriangles = {
+	export type SplittedTriangles = {
 		t0?: { p0: Vertex3d; p1: Vertex3d; p2: Vertex3d };
 		t1?: { p0: Vertex3d; p1: Vertex3d; p2: Vertex3d };
 		result: boolean;
 		flag: QuadrantSplitFlag;
 	};
 
-	type QuadrantSplitFlag = { notPlanar: boolean; invalidCase: boolean };
+	export type QuadrantSplitFlag = { notPlanar: boolean; invalidCase: boolean };
 
-	type Quadrant = {
+	export type Quadrant = {
 		p0: Vertex3d;
 		p1: Vertex3d;
 		p2: Vertex3d;
@@ -111,7 +111,7 @@ export namespace PolygonUtils {
 
 	const PLANARITY_TOLERANCE = 1e-20;
 
-	type CheckPtsOnPlanarResult = {
+	export type CheckPtsOnPlanarResult = {
 		result: boolean;
 		ptsNotEnough: boolean;
 		notPlanar: boolean;

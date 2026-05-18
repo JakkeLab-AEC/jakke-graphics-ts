@@ -29,18 +29,18 @@ export type Polyline2dEvaluationFactor = {
 	vertexIndex?: number;
 };
 
-interface FlagsStrict {
+export interface FlagsStrict {
 	isOpen: boolean; // polyline is not closed
 	outOfBoundingBox: boolean; // point is outside bounding box
 	onBoundary: boolean; // point lies on edge or vertex
 }
 
-interface IntersectionInfo {
+export interface IntersectionInfo {
 	pt: Vertex2d;
 	t: number;
 }
 
-interface PointInAreaResult extends FlagsStrict {
+export interface PointInAreaResult extends FlagsStrict {
 	result: boolean; // inside (true) / outside (false)
 	intersections: IntersectionInfo[]; // ray-casting intersections
 }
